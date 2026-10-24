@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { StopRun } from "../src/assess.ts";
-import { collect, type RunDeps } from "../src/radar.ts";
+import { checkFeeds, collect, type RunDeps } from "../src/radar.ts";
 import { Store } from "../src/store.ts";
 import { fakeAssessor, fakeFetch, fixture, item, NOW, testProfile, testSources } from "./helpers.ts";
 
@@ -172,4 +172,23 @@ test("the log names each Entry before it is assessed, then what it yielded, and 
   assert.equal(lines[2], `  1/2 ${ANNOUNCEMENTS}`);
   assert.match(lines[3]!, /^      2 Items in \d+s$/);
   assert.match(lines[5]!, /^      0 Items in \d+s$/);
+});
+
+test("a switched-off feed is not read", async () => {
+  const d = deps({ sources: testSources([{ ...BLOG, enabled: false }]) });
+  d.sources.openalex.enabled = false;
+  const report = await collect(d);
+  assert.equal(report.entriesRead, 0);
+});
+
+test("checking feeds reports which can be read, which are web pages, which fail and which are off", async () => {
+  const fetch = fakeFetch({ "https://blog.example/feed/": fixture("blog.rss.xml"), "https://page.example/": "<html><body>Hello</body></html>" });
+  const lines = await checkFeeds(
+    [BLOG, { id: "page", name: "Page", url: "https://page.example/" }, { id: "gone", name: "Gone", url: "https://gone.example/feed/" }, { id: "wechat", name: "WeChat", url: "http://localhost:4000/feeds/all.atom", enabled: false }],
+    fetch,
+  );
+  assert.match(lines[0]!, /^✓  Test Blog: 2 posts, newest 2026-10-/);
+  assert.match(lines[1]!, /^\?  Page: no posts found/);
+  assert.match(lines[2]!, /^✗  Gone: Gone returned 404/);
+  assert.match(lines[3]!, /^–  WeChat: switched off/);
 });

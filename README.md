@@ -7,7 +7,7 @@ dashboard on your Mac.
 - **What it means by Item, Kind, Call, Series, Score and so on:** [GLOSSARY.md](GLOSSARY.md)
 - **What was decided and why:** [DESIGN.md](DESIGN.md) and [docs/adr/](docs/adr/)
 
-This is **build stage 1**: OpenAlex plus five blog feeds, scoring, and the dashboard. The weekly Digest,
+This is **build stage 1**: OpenAlex plus a dozen blog and society feeds, scoring, and the dashboard. The weekly Digest,
 deadline Alerts and the Gmail label come in stage 2.
 
 ## Set up on your Mac
@@ -69,7 +69,41 @@ Logs go to `data/collect.log` and `data/dashboard.log`. To stop a job, run
 
 ## Sources
 
-Edit [config/sources.json](config/sources.json) to add or remove feeds. Any RSS or Atom feed works.
+Edit [config/sources.json](config/sources.json) to add or remove feeds. Any RSS or Atom feed works,
+including a blog's category feed (e.g. only its calls for papers), which saves the model reading
+commentary. To switch a feed off without deleting it, add `"enabled": false`.
+
+After changing the list, check that every address can be read before a long run:
+
+```sh
+npm run radar -- sources
+```
+
+It prints ✓ with the number of posts, ? when an address is a web page rather than a feed, and ✗ with the
+error. Nothing is assessed or saved.
+
+### WeChat Public Accounts (公众号)
+
+WeChat offers no feeds, but [WeWe RSS](https://github.com/cooderl/wewe-rss), a free tool you run on your
+Mac, turns the Public Accounts you choose into one feed via your WeChat Reading (微信读书) account.
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and start it.
+2. Start WeWe RSS, choosing your own password after `AUTH_CODE=`:
+   ```sh
+   docker run -d --name wewe-rss --restart unless-stopped -p 4000:4000 \
+     -e DATABASE_TYPE=sqlite -e AUTH_CODE=choose-a-password -e FEED_MODE=fulltext \
+     -v ~/wewe-rss:/app/data cooderl/wewe-rss-sqlite:latest
+   ```
+3. Open <http://localhost:4000> and enter that password. Under 账号管理 (accounts), add your WeChat
+   Reading account by scanning the QR code with WeChat.
+4. Under 公众号源 (Public Accounts), add each account by pasting the share link of any one of its
+   articles. Add a few at a time: adding many quickly gets you paused for 24 hours.
+5. In [config/sources.json](config/sources.json), change `"enabled": false` to `true` on
+   "WeChat Public Accounts", then run `npm run radar -- sources` to check it.
+
+WeWe RSS is an unofficial tool kept up by one person. The WeChat Reading login lapses now and then; when
+the check shows ✗ or the feed stops updating, scan the QR code again. Docker must be running at collect
+time (07:00 if you use the launchd job).
 
 ### OpenAlex key
 

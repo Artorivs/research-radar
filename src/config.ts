@@ -39,7 +39,15 @@ const SourcesSchema = z.object({
     lookbackDays: z.number().int().positive(),
     perQuery: z.number().int().positive().max(200),
   }),
-  feeds: z.array(z.object({ id: z.string().min(1), name: z.string(), url: z.string().url() })),
+  feeds: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string(),
+      url: z.string().url(),
+      /** false keeps a feed listed but unread, e.g. one that needs a local service running first. */
+      enabled: z.boolean().optional(),
+    }),
+  ),
 });
 
 export type Topic = z.infer<typeof TopicSchema>;
