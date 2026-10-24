@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type Anthropic from "@anthropic-ai/sdk";
-import { claudeAssessor, DEFAULT_MODEL, systemPrompt } from "../src/assess.ts";
+import Anthropic from "@anthropic-ai/sdk";
+import { claudeAssessor, DEFAULT_MODEL, StopRun, systemPrompt } from "../src/assess.ts";
 import type { Entry } from "../src/sources/entry.ts";
 import { item, testProfile } from "./helpers.ts";
 
@@ -61,4 +61,14 @@ test("a refusal yields no Items rather than an error", async () => {
 test("a truncated response is an error, so the Entry is retried next run", async () => {
   const { client } = stubClient({ stop_reason: "max_tokens", parsed_output: null });
   await assert.rejects(claudeAssessor(testProfile(), client)(entry, []), /cut off/);
+});
+
+test("an empty credit balance or a bad key stops the run instead of failing every Entry", async () => {
+  const failing = (error: Error) => ({ messages: { parse: async () => Promise.reject(error) } }) as unknown as Anthropic;
+  const credit = new Anthropic.BadRequestError(400, undefined, "Your credit balance is too low to access the Anthropic API.", new Headers());
+  await assert.rejects(claudeAssessor(testProfile(), failing(credit))(entry, []), (e: Error) => e instanceof StopRun && /credit balance/.test(e.message));
+  const key = new Anthropic.AuthenticationError(401, undefined, "invalid x-api-key", new Headers());
+  await assert.rejects(claudeAssessor(testProfile(), failing(key))(entry, []), StopRun);
+  const other = new Anthropic.BadRequestError(400, undefined, "prompt is too long", new Headers());
+  await assert.rejects(claudeAssessor(testProfile(), failing(other))(entry, []), (e: Error) => !(e instanceof StopRun));
 });

@@ -16,7 +16,7 @@ export interface Entry {
   paper: { doi: string | null; venue: string | null; versionLabel: string } | null;
 }
 
-export type Fetch = (url: string, init?: { headers?: Record<string, string> }) => Promise<{
+export type Fetch = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{
   ok: boolean;
   status: number;
   text(): Promise<string>;

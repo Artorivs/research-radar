@@ -1,5 +1,6 @@
 /**
- * Asks Claude what an Entry contains and how relevant it is to a Profile.
+ * Asks a model what an Entry contains and how relevant it is to a Profile. The schema and prompts here are
+ * shared by every provider; this file also holds the Claude provider (see ollama.ts for the local one).
  *
  * One call per Entry returns every Item in it (a Paper, or the Events, Calls, Courses, Awards and Jobs a
  * post announces), each with a Score on the written rubric, Topics, an Oxford English summary, and the
@@ -15,7 +16,7 @@ import type { CalibrationVote } from "./store.ts";
 
 export const DEFAULT_MODEL = "claude-haiku-5-5";
 
-function assessmentSchema(profile: Profile) {
+export function assessmentSchema(profile: Profile) {
   const topicNames: [string, ...string[]] = [ADJACENT, ...profile.topics.map((t) => t.name)];
   return z.object({
     items: z.array(
@@ -56,6 +57,12 @@ function assessmentSchema(profile: Profile) {
 
 export type Assessment = z.infer<ReturnType<typeof assessmentSchema>>;
 export type AssessedItem = Assessment["items"][number];
+
+/**
+ * Thrown by an Assessor when no further Entry can succeed this run (no credit, a bad key, the local model
+ * missing), so the run stops at once instead of failing every Entry the same way.
+ */
+export class StopRun extends Error {}
 
 /** Turns one Entry into its Items. Swappable so tests and dry runs need no API key. */
 export type Assessor = (entry: Entry, calibration: CalibrationVote[]) => Promise<AssessedItem[]>;
@@ -109,7 +116,7 @@ Judge relevance only. Location, travel and prestige never change the Score. Mate
 - language: zh-Hans for Simplified Chinese, zh-Hant for Traditional Chinese, ja, de, en, or other.`;
 }
 
-function entryPrompt(entry: Entry, calibration: CalibrationVote[]): string {
+export function entryPrompt(entry: Entry, calibration: CalibrationVote[]): string {
   const votes =
     calibration.length > 0
       ? `Recent votes by the researcher, for calibration (👍 wants more like this, 👎 wants less):\n${calibration
@@ -127,17 +134,29 @@ Title: ${entry.title}
 ${entry.text || "(no text)"}`;
 }
 
-export function claudeAssessor(profile: Profile, client = new Anthropic(), model = process.env.RADAR_MODEL ?? DEFAULT_MODEL): Assessor {
+export function claudeAssessor(profile: Profile, client = new Anthropic(), model = DEFAULT_MODEL): Assessor {
   const format = zodOutputFormat(assessmentSchema(profile));
   const system = systemPrompt(profile);
   return async (entry, calibration) => {
-    const response = await client.messages.parse({
-      model,
-      max_tokens: 16000,
-      output_config: { effort: "low", format },
-      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: entryPrompt(entry, calibration) }],
-    });
+    let response;
+    try {
+      response = await client.messages.parse({
+        model,
+        max_tokens: 16000,
+        output_config: { effort: "low", format },
+        system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+        messages: [{ role: "user", content: entryPrompt(entry, calibration) }],
+      });
+    } catch (error) {
+      if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
+        throw new StopRun(`The Anthropic API refused the key: ${error.message}`);
+      }
+      // An empty balance comes back as a plain 400 with no error type of its own.
+      if (error instanceof Anthropic.BadRequestError && /credit balance/i.test(error.message)) {
+        throw new StopRun("Your Anthropic credit balance is too low. Add credits, or switch to a local model (see README).");
+      }
+      throw error;
+    }
     if (response.stop_reason === "refusal") {
       console.warn(`Skipped "${entry.title}": the model declined (${response.stop_details?.category ?? "no category"})`);
       return [];

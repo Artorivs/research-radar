@@ -1,14 +1,14 @@
 /**
  * Command line entry point.
  *
- *   npm run radar -- collect [--limit N]   read every Source and file new Items
+ *   npm run radar -- collect [--limit N] [--provider claude|ollama]   read every Source and file new Items
  *   npm run radar -- serve [--port 4747]   open the dashboard at http://localhost:4747
  */
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { claudeAssessor } from "./assess.ts";
 import { loadProfile, loadSources } from "./config.ts";
+import { chooseAssessor } from "./provider.ts";
 import { collect } from "./radar.ts";
 import { startServer } from "./server.ts";
 import type { Fetch } from "./sources/entry.ts";
@@ -24,6 +24,7 @@ const { positionals, values } = parseArgs({
     db: { type: "string", default: process.env.RADAR_DB ?? resolve(root, "data/radar.sqlite") },
     port: { type: "string", default: "4747" },
     limit: { type: "string" },
+    provider: { type: "string" },
   },
 });
 
@@ -33,11 +34,13 @@ const store = new Store(values.db);
 
 switch (positionals[0]) {
   case "collect": {
+    const { provider, model, assess } = chooseAssessor(profile, process.env, fetch as Fetch, values.provider);
+    console.log(`Assessing with ${provider} (${model})`);
     const report = await collect({
       profile,
       sources: loadSources(values.sources),
       store,
-      assess: claudeAssessor(profile),
+      assess,
       fetch: fetch as Fetch,
       now: new Date(),
       limitPerSource: values.limit ? Number(values.limit) : undefined,
@@ -49,8 +52,9 @@ switch (positionals[0]) {
         (report.entriesDeferred ? `; ${report.entriesDeferred} left for the next run (--limit)` : ""),
     );
     for (const f of report.failures) console.error(`  ✗ ${f}`);
+    if (report.stopped) console.error(`\nStopped early: ${report.stopped}\nNothing was lost; the next run picks up the remaining Entries.`);
     store.close();
-    process.exitCode = report.failures.length > 0 && report.entriesAssessed === 0 ? 1 : 0;
+    process.exitCode = report.stopped || (report.failures.length > 0 && report.entriesAssessed === 0) ? 1 : 0;
     break;
   }
   case "serve": {
@@ -60,6 +64,6 @@ switch (positionals[0]) {
     break;
   }
   default:
-    console.log("Usage: npm run radar -- collect [--limit N] | serve [--port 4747]");
+    console.log("Usage: npm run radar -- collect [--limit N] [--provider claude|ollama] | serve [--port 4747]");
     process.exitCode = positionals[0] ? 1 : 0;
 }

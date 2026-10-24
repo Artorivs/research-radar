@@ -19,15 +19,17 @@ deadline Alerts and the Gmail label come in stage 2.
    cd ~/research-radar
    npm install
    ```
-3. Add your Anthropic API key:
+3. Choose the model that reads and scores Entries, and set it in `.env`:
    ```sh
    cp .env.example .env
-   open -e .env        # paste the key after ANTHROPIC_API_KEY=
+   open -e .env
    ```
+   - **Claude** (the default): paste your key after `ANTHROPIC_API_KEY=`.
+   - **A free local model**: set `RADAR_PROVIDER=ollama` and follow [Local model](#local-model) below.
 4. Check [config/profile.json](config/profile.json). It holds your Topics, the search phrases used for
    OpenAlex (in English, Chinese, Japanese and German), your timezone and the thresholds. Set `timezone`
    to yours, e.g. `"Europe/London"` or `"Asia/Hong_Kong"`. You can add seed papers under `"seeds"`.
-5. Try a small first run. `--limit 3` sends only three new Entries per Source to Claude; the rest wait
+5. Try a small first run. `--limit 3` sends only three new Entries per Source to the model; the rest wait
    for the next run.
    ```sh
    npm run radar -- collect --limit 3
@@ -70,11 +72,35 @@ Logs go to `data/collect.log` and `data/dashboard.log`. To stop a job, run
 Edit [config/sources.json](config/sources.json) to add or remove feeds. Any RSS or Atom feed works.
 Setting `openalex.mailto` to your email puts OpenAlex requests in its faster "polite pool".
 
+## Local model
+
+Collection can run entirely on your Mac with [Ollama](https://ollama.com), at no cost.
+
+1. Install Ollama (`brew install ollama`, or the app from ollama.com) and start it.
+2. Download a model. The default is Qwen3 14B, which handles English, Chinese, Japanese and German well
+   and needs about 10 GB of memory:
+   ```sh
+   ollama pull qwen3:14b
+   ```
+   With 32 GB or more, `qwen3:30b` judges better at a similar speed; set `RADAR_MODEL=qwen3:30b`.
+3. In `.env`, set `RADAR_PROVIDER=ollama`. For a single run, use `--provider ollama` instead:
+   ```sh
+   npm run radar -- collect --limit 3 --provider ollama
+   ```
+
+A local model takes roughly 10–30 seconds per Entry on Apple silicon, so the first full run (several
+hundred Entries) is best left overnight. After that, a day's new Entries take minutes. Its Scores and
+summaries are rougher than Claude's; your 👍/👎 Votes help either way.
+
 ## Cost
 
-Each new Entry is one request to Claude Haiku 5.5 (`claude-haiku-5-5`). A rough estimate for this
-source list is $1–3 a month. To try a stronger model, set `RADAR_MODEL=claude-opus-5-5` in `.env`; it
+With Claude, each new Entry is one request to Claude Haiku 5.5 (`claude-haiku-5-5`). A rough estimate for
+this source list is $1–3 a month. To try a stronger model, set `RADAR_MODEL=claude-opus-5-5` in `.env`; it
 judges better but costs about 40 times as much, which would break the $10 budget at full volume.
+
+If the run hits an empty credit balance, a rejected key, a stopped Ollama or a model that isn't
+downloaded, it stops at once and says how to fix it. Nothing is lost: the next run picks up every Entry
+that wasn't assessed.
 
 ## Development
 
@@ -89,7 +115,8 @@ The code follows the glossary's terms:
 |---|---|
 | `src/domain.ts` | Kinds, Statuses, Deadlines, Past, Series keys |
 | `src/sources/` | Reading OpenAlex and RSS/Atom feeds into Entries |
-| `src/assess.ts` | The Claude request: rubric, Kinds, Deadlines, Oxford English summaries |
+| `src/assess.ts` | The shared schema and prompt (rubric, Kinds, Deadlines, Oxford English summaries), and the Claude provider |
+| `src/ollama.ts`, `src/provider.ts` | The local Ollama provider, and choosing between the two |
 | `src/radar.ts` | One collection run: dedupe, Versions, Series Votes, filing Items |
 | `src/store.ts` | The SQLite archive (`data/radar.sqlite`) |
 | `src/views.ts` | Thresholds and the deadline calendar |

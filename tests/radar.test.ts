@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { StopRun } from "../src/assess.ts";
 import { collect, type RunDeps } from "../src/radar.ts";
 import { Store } from "../src/store.ts";
 import { fakeAssessor, fakeFetch, fixture, item, NOW, testProfile, testSources } from "./helpers.ts";
@@ -149,4 +150,15 @@ test("the same Event from two Sources is merged into one Item", async () => {
   const conference = d.store.items("arthur").find((i) => i.kind === "conference")!;
   assert.equal(conference.versions.length, 1, "same URL, so one Version");
   assert.equal(conference.deadlines.length, 1, "identical Deadlines are not duplicated");
+});
+
+test("a StopRun ends the run at once and leaves every Entry for next time", async () => {
+  const d = deps();
+  let calls = 0;
+  const report = await collect({ ...d, assess: async () => (calls++, Promise.reject(new StopRun("no credit"))) });
+  assert.equal(calls, 1);
+  assert.equal(report.stopped, "no credit");
+  assert.deepEqual(report.failures, []);
+  const next = await collect(d);
+  assert.equal(next.entriesAssessed, 3);
 });

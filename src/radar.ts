@@ -2,7 +2,7 @@
  * One collection run: read every Source, skip Entries already seen, assess the rest, and file the
  * resulting Items into the Store, merging duplicates and new Versions into what is already there.
  */
-import type { Assessor, AssessedItem } from "./assess.ts";
+import { StopRun, type Assessor, type AssessedItem } from "./assess.ts";
 import type { Profile, SourcesConfig } from "./config.ts";
 import { isEvent, seriesKeyFor, type Deadline, type Kind } from "./domain.ts";
 import type { Entry, Fetch } from "./sources/entry.ts";
@@ -23,6 +23,8 @@ export interface RunReport {
   /** New Entries held back by limitPerSource; they are read on a later run. */
   entriesDeferred: number;
   failures: string[];
+  /** Why the run ended early, if it did (see StopRun). */
+  stopped: string | null;
 }
 
 export interface RunDeps {
@@ -40,7 +42,7 @@ export interface RunDeps {
 export async function collect(deps: RunDeps): Promise<RunReport> {
   const { profile, sources, store, fetch, now } = deps;
   const log = deps.log ?? (() => {});
-  const report: RunReport = { entriesRead: 0, entriesAssessed: 0, itemsAdded: 0, itemsMerged: 0, versionsAdded: 0, entriesDeferred: 0, failures: [] };
+  const report: RunReport = { entriesRead: 0, entriesAssessed: 0, itemsAdded: 0, itemsMerged: 0, versionsAdded: 0, entriesDeferred: 0, failures: [], stopped: null };
 
   const readers: Array<[string, () => Promise<Entry[]>]> = [
     ["OpenAlex", () => readOpenAlex(profile, sources.openalex, fetch, now)],
@@ -65,6 +67,10 @@ export async function collect(deps: RunDeps): Promise<RunReport> {
         await fileEntry(entry, deps, report);
         store.markSeen(entry.source, entry.entryId, now);
       } catch (error) {
+        if (error instanceof StopRun) {
+          report.stopped = error.message;
+          return report;
+        }
         report.failures.push(`${name} "${entry.title}": ${describe(error)}`);
       }
     }

@@ -67,7 +67,8 @@ English, Chinese (Simplified and Traditional), Japanese, German.
   plus named journal/society sites.
 
 ## 6. Relevance scoring
-- Claude API (default `claude-haiku-5-5`, configurable via `RADAR_MODEL`) scores each item **−10 to +10** against the
+- A model scores each item: the Claude API (default `claude-haiku-5-5`) or a local model through
+  Ollama (default `qwen3:14b`), chosen by `RADAR_PROVIDER` and `RADAR_MODEL`. It scores each item **−10 to +10** against the
   profile, using a written rubric per band, and writes the summary and topics.
 - 👍/👎 feedback on the dashboard tunes future scoring: the 30 most recent Votes
   are sent with each assessment as calibration.
