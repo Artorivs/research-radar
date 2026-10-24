@@ -18,10 +18,11 @@ const CONTEXT_TOKENS = 16_384;
  */
 const MAX_ENTRY_CHARS = 12_000;
 /**
- * A cap on the answer's length. A real answer is a few hundred tokens per Item; without a cap, a model
+ * A cap on the answer's length. A real answer is a few hundred tokens per Item, and an announcements post can hold ten
+ * Items; without a cap, a model
  * that falls into repeating itself writes until the context is full, which can take a quarter of an hour.
  */
-export const MAX_ANSWER_TOKENS = 4_096;
+export const MAX_ANSWER_TOKENS = 8_192;
 /** Errors that mean nothing is listening at the host, as opposed to one slow or failed request. */
 const UNREACHABLE = new Set(["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH"]);
 

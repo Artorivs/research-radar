@@ -70,7 +70,18 @@ Logs go to `data/collect.log` and `data/dashboard.log`. To stop a job, run
 ## Sources
 
 Edit [config/sources.json](config/sources.json) to add or remove feeds. Any RSS or Atom feed works.
-Setting `openalex.mailto` to your email puts OpenAlex requests in its faster "polite pool".
+
+### OpenAlex key
+
+OpenAlex bills each search against a small free daily allowance. A collect run makes one search per
+query in your profile (42 at present), so without a key the allowance runs out after a run or two a day,
+and OpenAlex answers "429". A free key raises the allowance tenfold, which is ample for a daily run:
+
+1. Create a free account at [openalex.org](https://openalex.org) and copy the API key from your account
+   settings.
+2. Add it to `.env`: `OPENALEX_API_KEY=your-key`.
+
+If the allowance does run out, the feeds are still read; Papers are picked up on the next run.
 
 ## Local model
 

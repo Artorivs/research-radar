@@ -34,6 +34,8 @@ const SourcesSchema = z.object({
     enabled: z.boolean(),
     /** Your email, sent to OpenAlex to join its faster "polite pool". Optional. */
     mailto: z.string().default(""),
+    /** A free OpenAlex API key, which raises the daily allowance tenfold. Set OPENALEX_API_KEY in .env, not here. */
+    apiKey: z.string().optional(),
     lookbackDays: z.number().int().positive(),
     perQuery: z.number().int().positive().max(200),
   }),
@@ -50,4 +52,8 @@ export function loadProfile(path: string): Profile {
 
 export function loadSources(path: string): SourcesConfig {
   return SourcesSchema.parse(JSON.parse(readFileSync(path, "utf8")));
+}
+
+export function withOpenAlexKey(sources: SourcesConfig, key: string | undefined): SourcesConfig {
+  return key ? { ...sources, openalex: { ...sources.openalex, apiKey: key } } : sources;
 }
