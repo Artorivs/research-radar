@@ -5,11 +5,11 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=22.13"
   },
   "scripts": {
-    "radar": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning src/cli.ts",
-    "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.ts",
+    "radar": "node --experimental-strip-types --env-file-if-exists=.env --disable-warning=ExperimentalWarning src/cli.ts",
+    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test tests/*.test.ts",
     "typecheck": "tsc"
   },
   "dependencies": {
