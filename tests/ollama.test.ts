@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { createServer, type RequestListener } from "node:http";
+import type { AddressInfo } from "node:net";
 import { test } from "node:test";
 import { assessmentSchema, StopRun } from "../src/assess.ts";
-import { jsonSchemaFor, ollamaAssessor } from "../src/ollama.ts";
+import { joinStream, jsonSchemaFor, ollamaAssessor } from "../src/ollama.ts";
 import { chooseAssessor } from "../src/provider.ts";
 import type { Entry, Fetch } from "../src/sources/entry.ts";
 import { item, testProfile } from "./helpers.ts";
@@ -35,12 +37,12 @@ test("the local model gets the shared prompts, a JSON Schema to follow, and a la
   assert.deepEqual(items, answer.items);
   const body = bodies[0]!;
   assert.equal(body.model, "qwen3:14b");
-  assert.equal(body.stream, false);
+  assert.equal(body.stream, true);
   assert.equal(body.think, false);
   assert.equal((body.options as { num_ctx: number }).num_ctx, 16_384);
   const messages = body.messages as Array<{ role: string; content: string }>;
   assert.match(messages[0]!.content, /Score: integer from -10 to \+10/);
-  assert.ok(messages[1]!.content.length < 25_000, "long posts are cut to fit");
+  assert.ok(messages[1]!.content.length < 13_000, "long posts are cut to fit");
   assert.match(messages[1]!.content, /\[…cut\]$/);
   assert.equal((body.format as { type: string }).type, "object");
 });
@@ -61,9 +63,46 @@ test("an answer that isn't valid JSON, or doesn't fit the schema, fails that Ent
 
 test("a missing model or a stopped Ollama stops the run with a fix", async () => {
   await assert.rejects(ollamaAssessor(testProfile(), ollama({ status: 404, raw: "{}" }).fetch, "qwen3:14b")(entry, []), (e: Error) => e instanceof StopRun && /ollama pull qwen3:14b/.test(e.message));
-  const refused: Fetch = async () => Promise.reject(new TypeError("fetch failed"));
-  await assert.rejects(ollamaAssessor(testProfile(), refused)(entry, []), (e: Error) => e instanceof StopRun && /isn't answering/.test(e.message));
+  const closed = await listen(() => {});
+  closed.server.close();
+  await assert.rejects(ollamaAssessor(testProfile(), fetch, "m", closed.url)(entry, []), (e: Error) => e instanceof StopRun && /isn't answering/.test(e.message));
 });
+
+test("a streamed answer is read in full over real HTTP", async () => {
+  const answer = JSON.stringify({ items: [item({ kind: "call", title: "Special issue" })] });
+  const { server, url } = await listen((_req, res) => {
+    res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+    const pieces = [answer.slice(0, 40), answer.slice(40)];
+    for (const content of pieces) res.write(JSON.stringify({ message: { role: "assistant", content }, done: false }) + "\n");
+    res.end(JSON.stringify({ message: { role: "assistant", content: "" }, done: true }) + "\n");
+  });
+  try {
+    const items = await ollamaAssessor(testProfile(), fetch, "m", url)(entry, []);
+    assert.equal(items[0]!.title, "Special issue");
+  } finally {
+    server.close();
+  }
+});
+
+test("a request Ollama drops part-way fails that Entry only, without stopping the run", async () => {
+  const { server, url } = await listen((req) => req.socket.destroy());
+  try {
+    await assert.rejects(ollamaAssessor(testProfile(), fetch, "m", url)(entry, []), (e: Error) => !(e instanceof StopRun) && /didn't finish/.test(e.message));
+  } finally {
+    server.close();
+  }
+});
+
+test("an error reported mid-stream is surfaced", () => {
+  assert.equal(joinStream('{"message":{"content":"{\\"a\\":"}}\n{"message":{"content":"1}"}}\n'), '{"a":1}');
+  assert.throws(() => joinStream('{"error":"model runner has unexpectedly stopped"}\n'), /unexpectedly stopped/);
+});
+
+async function listen(handler: RequestListener) {
+  const server = createServer(handler);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return { server, url: `http://127.0.0.1:${(server.address() as AddressInfo).port}` };
+}
 
 test("the provider comes from --provider, then RADAR_PROVIDER, then defaults to Claude", () => {
   const fetch = ollama({}).fetch;
