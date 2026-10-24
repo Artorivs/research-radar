@@ -12,7 +12,7 @@ deadline Alerts and the Gmail label come in stage 2.
 
 ## Set up on your Mac
 
-1. Install Node.js 22.18 or newer (`node --version` shows yours; `brew install node` if needed).
+1. Install Node.js 22.13 or newer (`node --version` shows yours; `brew install node` if needed).
 2. Clone this repository and install it:
    ```sh
    git clone https://github.com/Artorivs/research-radar.git ~/research-radar
