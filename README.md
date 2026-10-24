@@ -88,9 +88,16 @@ Collection can run entirely on your Mac with [Ollama](https://ollama.com), at no
    npm run radar -- collect --limit 3 --provider ollama
    ```
 
-A local model takes roughly 10–30 seconds per Entry on Apple silicon, so the first full run (several
-hundred Entries) is best left overnight. After that, a day's new Entries take minutes. Its Scores and
-summaries are rougher than Claude's; your 👍/👎 Votes help either way.
+A local model takes roughly 20–60 seconds per Entry on Apple silicon (long blog posts take the longest),
+so the first full run (several hundred Entries) is best left overnight. After that, a day's new Entries
+take minutes. Its Scores and summaries are rougher than Claude's; your 👍/👎 Votes help either way.
+
+The run prints each Entry as it starts and how long it took. You can stop it at any time with Ctrl-C:
+finished Entries are kept, and the rest wait for the next run.
+
+If it is much slower than that, run `ollama ps` while it works. `PROCESSOR` should say `100% GPU`; if it
+shows CPU, close other memory-hungry apps or use a smaller model. `qwen3:8b` is about twice as fast and
+needs about 6 GB (`ollama pull qwen3:8b`, then `RADAR_MODEL=qwen3:8b`).
 
 ## Cost
 
