@@ -55,6 +55,7 @@ export async function collect(deps: RunDeps): Promise<RunReport> {
       entries = await read();
     } catch (error) {
       report.failures.push(`${name}: ${describe(error)}`);
+      log(`${name}: couldn't read it (${describe(error)})`);
       continue;
     }
     const unseen = entries.filter((e) => e.entryId && !store.hasSeen(e.source, e.entryId));
@@ -62,23 +63,30 @@ export async function collect(deps: RunDeps): Promise<RunReport> {
     report.entriesRead += entries.length;
     report.entriesDeferred += unseen.length - fresh.length;
     log(`${name}: ${entries.length} entries, ${unseen.length} new`);
-    for (const entry of fresh) {
+    for (const [i, entry] of fresh.entries()) {
+      // Each line is written before the Entry is assessed, so a slow local model visibly works on something.
+      log(`  ${i + 1}/${fresh.length} ${entry.title}`);
+      const started = Date.now();
+      const took = () => `${Math.round((Date.now() - started) / 1000)}s`;
       try {
-        await fileEntry(entry, deps, report);
+        const found = await fileEntry(entry, deps, report);
         store.markSeen(entry.source, entry.entryId, now);
+        log(found === null ? "      already in the archive" : `      ${found} ${found === 1 ? "Item" : "Items"} in ${took()}`);
       } catch (error) {
         if (error instanceof StopRun) {
           report.stopped = error.message;
           return report;
         }
         report.failures.push(`${name} "${entry.title}": ${describe(error)}`);
+        log(`      failed after ${took()}: ${describe(error)}`);
       }
     }
   }
   return report;
 }
 
-async function fileEntry(entry: Entry, deps: RunDeps, report: RunReport): Promise<void> {
+/** Files one Entry and returns how many Items the model found in it, or null for a known Paper's new Version. */
+async function fileEntry(entry: Entry, deps: RunDeps, report: RunReport): Promise<number | null> {
   const { profile, store, now } = deps;
   const version = { source: entry.source, url: entry.url, label: entry.paper?.versionLabel ?? entry.source, seenAt: now.toISOString() };
 
@@ -90,7 +98,7 @@ async function fileEntry(entry: Entry, deps: RunDeps, report: RunReport): Promis
         report.versionsAdded++;
         store.noteNewVersion(existing, profile.id, `now ${entry.paper.versionLabel}`);
       }
-      return;
+      return null;
     }
   }
 
@@ -114,6 +122,7 @@ async function fileEntry(entry: Entry, deps: RunDeps, report: RunReport): Promis
       store.saveJudgement(id, profile.id, clampScore(raw.score + seriesShift), [...new Set(raw.topics)]);
     }
   }
+  return assessed.length;
 
   function toNewItem(raw: AssessedItem, from: Entry): NewItem {
     const kind: Kind = from.paper ? "paper" : raw.kind;

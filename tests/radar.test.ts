@@ -162,3 +162,14 @@ test("a StopRun ends the run at once and leaves every Entry for next time", asyn
   const next = await collect(d);
   assert.equal(next.entriesAssessed, 3);
 });
+
+test("the log names each Entry before it is assessed, then what it yielded, and reports a failing Source at once", async () => {
+  const lines: string[] = [];
+  const d = deps({ fetch: fakeFetch({ "https://blog.example/feed/": fixture("blog.rss.xml") }), log: (line) => lines.push(line) });
+  await collect(d);
+  assert.match(lines[0]!, /^OpenAlex: couldn't read it \(OpenAlex returned 404/);
+  assert.equal(lines[1], "Test Blog: 2 entries, 2 new");
+  assert.equal(lines[2], `  1/2 ${ANNOUNCEMENTS}`);
+  assert.match(lines[3]!, /^      2 Items in \d+s$/);
+  assert.match(lines[5]!, /^      0 Items in \d+s$/);
+});

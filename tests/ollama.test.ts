@@ -40,6 +40,7 @@ test("the local model gets the shared prompts, a JSON Schema to follow, and a la
   assert.equal(body.stream, true);
   assert.equal(body.think, false);
   assert.equal((body.options as { num_ctx: number }).num_ctx, 16_384);
+  assert.equal((body.options as { num_predict: number }).num_predict, 4_096, "a looping answer is cut short");
   const messages = body.messages as Array<{ role: string; content: string }>;
   assert.match(messages[0]!.content, /Score: integer from -10 to \+10/);
   assert.ok(messages[1]!.content.length < 13_000, "long posts are cut to fit");
@@ -96,6 +97,7 @@ test("a request Ollama drops part-way fails that Entry only, without stopping th
 test("an error reported mid-stream is surfaced", () => {
   assert.equal(joinStream('{"message":{"content":"{\\"a\\":"}}\n{"message":{"content":"1}"}}\n'), '{"a":1}');
   assert.throws(() => joinStream('{"error":"model runner has unexpectedly stopped"}\n'), /unexpectedly stopped/);
+  assert.throws(() => joinStream('{"message":{"content":"{\\"a\\":"}}\n{"done":true,"done_reason":"length"}\n'), /repeating itself/);
 });
 
 async function listen(handler: RequestListener) {

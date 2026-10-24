@@ -17,6 +17,11 @@ const CONTEXT_TOKENS = 16_384;
  * Announcements put the essentials first; long tails are almost always commentary, which yields no Items.
  */
 const MAX_ENTRY_CHARS = 12_000;
+/**
+ * A cap on the answer's length. A real answer is a few hundred tokens per Item; without a cap, a model
+ * that falls into repeating itself writes until the context is full, which can take a quarter of an hour.
+ */
+export const MAX_ANSWER_TOKENS = 4_096;
 /** Errors that mean nothing is listening at the host, as opposed to one slow or failed request. */
 const UNREACHABLE = new Set(["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH"]);
 
@@ -39,7 +44,7 @@ export function ollamaAssessor(profile: Profile, fetch: Fetch, model = OLLAMA_DE
           stream: true,
           think: false,
           format,
-          options: { temperature: 0, num_ctx: CONTEXT_TOKENS },
+          options: { temperature: 0, num_ctx: CONTEXT_TOKENS, num_predict: MAX_ANSWER_TOKENS },
           messages: [
             { role: "system", content: system },
             { role: "user", content: entryPrompt(trimmed, calibration) },
@@ -74,8 +79,9 @@ export function joinStream(ndjson: string): string {
   let content = "";
   for (const line of ndjson.split("\n")) {
     if (!line.trim()) continue;
-    const chunk = JSON.parse(line) as { message?: { content?: string }; error?: string };
+    const chunk = JSON.parse(line) as { message?: { content?: string }; error?: string; done_reason?: string };
     if (chunk.error) throw new Error(`Ollama: ${chunk.error}`);
+    if (chunk.done_reason === "length") throw new Error(`the model's answer ran past ${MAX_ANSWER_TOKENS} tokens (it was probably repeating itself)`);
     content += chunk.message?.content ?? "";
   }
   return content;
