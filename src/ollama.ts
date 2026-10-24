@@ -12,8 +12,13 @@ export const OLLAMA_DEFAULT_HOST = "http://localhost:11434";
 
 /** Room for the system prompt, a long post and the answer; Ollama's own default context is far smaller. */
 const CONTEXT_TOKENS = 16_384;
-/** Long posts are cut to this many characters so the prompt fits the context. */
-const MAX_ENTRY_CHARS = 24_000;
+/**
+ * Long posts are cut to this many characters (about 3,000–4,000 tokens) to keep each Entry quick.
+ * Announcements put the essentials first; long tails are almost always commentary, which yields no Items.
+ */
+const MAX_ENTRY_CHARS = 12_000;
+/** Errors that mean nothing is listening at the host, as opposed to one slow or failed request. */
+const UNREACHABLE = new Set(["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH"]);
 
 export function ollamaAssessor(profile: Profile, fetch: Fetch, model = OLLAMA_DEFAULT_MODEL, host = OLLAMA_DEFAULT_HOST): Assessor {
   const schema = assessmentSchema(profile);
@@ -22,13 +27,16 @@ export function ollamaAssessor(profile: Profile, fetch: Fetch, model = OLLAMA_DE
   return async (entry, calibration) => {
     const trimmed = entry.text.length > MAX_ENTRY_CHARS ? { ...entry, text: `${entry.text.slice(0, MAX_ENTRY_CHARS)}\n[…cut]` } : entry;
     let res: Awaited<ReturnType<Fetch>>;
+    let body: string;
     try {
+      // Streaming makes Ollama send headers with its first token, so a slow answer isn't cut off by
+      // fetch's five-minute wait for response headers.
       res = await fetch(`${host}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model,
-          stream: false,
+          stream: true,
           think: false,
           format,
           options: { temperature: 0, num_ctx: CONTEXT_TOKENS },
@@ -38,13 +46,17 @@ export function ollamaAssessor(profile: Profile, fetch: Fetch, model = OLLAMA_DE
           ],
         }),
       });
-    } catch {
-      throw new StopRun(`Ollama isn't answering at ${host}. Open the Ollama app (or run \`ollama serve\`) and try again.`);
+      body = await res.text();
+    } catch (error) {
+      const code = causeCode(error);
+      if (code && UNREACHABLE.has(code)) {
+        throw new StopRun(`Ollama isn't answering at ${host}. Open the Ollama app (or run \`ollama serve\`) and try again.`);
+      }
+      throw new Error(`Ollama didn't finish this Entry (${code ?? (error as Error).message})`);
     }
-    const body = await res.text();
     if (res.status === 404) throw new StopRun(`Ollama doesn't have the model "${model}". Run \`ollama pull ${model}\` first.`);
     if (!res.ok) throw new Error(`Ollama returned ${res.status}: ${body.slice(0, 200)}`);
-    const content = (JSON.parse(body) as { message?: { content?: string } }).message?.content ?? "";
+    const content = joinStream(body);
     let json: unknown;
     try {
       json = JSON.parse(content);
@@ -55,6 +67,23 @@ export function ollamaAssessor(profile: Profile, fetch: Fetch, model = OLLAMA_DE
     if (!parsed.success) throw new Error(`the model's answer didn't match the schema: ${parsed.error.issues[0]?.message ?? "unknown"}`);
     return parsed.data.items;
   };
+}
+
+/** Ollama streams one JSON object per line; the answer is their `message.content` pieces in order. */
+export function joinStream(ndjson: string): string {
+  let content = "";
+  for (const line of ndjson.split("\n")) {
+    if (!line.trim()) continue;
+    const chunk = JSON.parse(line) as { message?: { content?: string }; error?: string };
+    if (chunk.error) throw new Error(`Ollama: ${chunk.error}`);
+    content += chunk.message?.content ?? "";
+  }
+  return content;
+}
+
+function causeCode(error: unknown): string | undefined {
+  const cause = (error as { cause?: { code?: string } }).cause;
+  return cause?.code ?? (error as { code?: string }).code;
 }
 
 /**
