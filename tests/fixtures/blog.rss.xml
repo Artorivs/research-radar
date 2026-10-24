@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<channel>
+  <title>Test Blog</title>
+  <item>
+    <title>Announcements: ESIL 2027 Annual Conference; RCSL panel call</title>
+    <link>https://blog.example/announcements-1</link>
+    <guid isPermaLink="false">https://blog.example/?p=101</guid>
+    <pubDate>Mon, 19 Oct 2026 08:00:00 +0000</pubDate>
+    <content:encoded><![CDATA[<p><strong>ESIL 2027 Annual Conference.</strong> The European Society of International Law will meet in Leiden, 9&#8211;11 September 2027. Abstracts are due 15 January 2027 (23:59 CET). Keynote: Jane Doe.</p><p><strong>RCSL panel at LSA 2027.</strong> The working group on computational law invites papers for a panel at the LSA 2027 Annual Meeting. Send abstracts by 1 December 2026.</p>]]></content:encoded>
+  </item>
+  <item>
+    <title>The ICJ&#8217;s advisory opinion: a comment</title>
+    <link>https://blog.example/comment-2</link>
+    <guid isPermaLink="false">https://blog.example/?p=102</guid>
+    <pubDate>Tue, 20 Oct 2026 08:00:00 +0000</pubDate>
+    <description>&lt;p&gt;Some thoughts on the opinion.&lt;/p&gt;</description>
+  </item>
+</channel>
+</rss>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Keeps the dashboard running at http://localhost:4747 whenever you are logged in.
+     Replace RADAR_DIR with the folder you cloned research-radar into, then see README.md. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.research-radar.dashboard</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string><string>-lc</string>
+    <string>cd "RADAR_DIR" &amp;&amp; mkdir -p data &amp;&amp; exec npm run --silent radar -- serve &gt;&gt; data/dashboard.log 2&gt;&amp;1</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+</dict>
+</plist>

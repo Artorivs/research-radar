@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Collects every morning at 07:00. If the Mac is asleep then, launchd runs it when the Mac wakes.
+     Replace RADAR_DIR with the folder you cloned research-radar into, then see README.md. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.research-radar.collect</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string><string>-lc</string>
+    <string>cd "RADAR_DIR" &amp;&amp; mkdir -p data &amp;&amp; npm run --silent radar -- collect &gt;&gt; data/collect.log 2&gt;&amp;1</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>0</integer></dict>
+</dict>
+</plist>

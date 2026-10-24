@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research Radar</title>
+<style>
+  :root {
+    --bg: #f7f6f2; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6a65; --line: #e2e0d8;
+    --accent: #2d5b8a; --good: #2f7a4b; --bad: #a33a2b; --chip: #eef0f3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --card: #20201e; --ink: #ecebe6; --muted: #a09f98; --line: #34332f;
+      --accent: #7fb0e0; --good: #6cc28c; --bad: #e0806f; --chip: #2b2d31; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", "PingFang TC", "Hiragino Sans", sans-serif; }
+  header { padding: 20px 16px 8px; max-width: 980px; margin: 0 auto; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 20px; margin: 0; }
+  header a { color: var(--accent); }
+  .filters { max-width: 980px; margin: 0 auto; padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  select, input[type=search] { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--ink); }
+  input[type=search] { flex: 1 1 200px; }
+  label.toggle { color: var(--muted); font-size: 13px; display: inline-flex; gap: 4px; align-items: center; }
+  .count { max-width: 980px; margin: 0 auto; padding: 0 16px; color: var(--muted); font-size: 13px; }
+  main { max-width: 980px; margin: 0 auto; padding: 8px 16px 40px; display: grid; gap: 10px; }
+  article { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; grid-template-columns: 44px 1fr; gap: 4px 12px; }
+  article.faded { opacity: .55; }
+  .score { grid-row: span 3; font-weight: 700; font-size: 18px; text-align: center; padding-top: 2px; font-variant-numeric: tabular-nums; }
+  .score.hi { color: var(--good); } .score.lo { color: var(--bad); }
+  .meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .kind { text-transform: uppercase; letter-spacing: .04em; font-weight: 600; font-size: 11px; color: var(--accent); }
+  h2 { font-size: 16px; margin: 0; line-height: 1.35; }
+  h2 a { color: inherit; text-decoration: none; } h2 a:hover { text-decoration: underline; }
+  .summary { margin: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { background: var(--chip); border-radius: 999px; padding: 1px 8px; font-size: 12px; }
+  .deadline { font-weight: 600; color: var(--bad); }
+  .note { color: var(--good); font-size: 13px; }
+  details { font-size: 13px; color: var(--muted); }
+  .actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+  button { font: inherit; font-size: 13px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--ink); cursor: pointer; }
+  button.on { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Research Radar</h1>
+  <span class="meta"><span id="who"></span> · <a href="/deadlines.ics">Export deadlines (.ics)</a></span>
+</header>
+<div class="filters">
+  <input type="search" id="q" placeholder="Search titles, summaries, abstracts">
+  <select id="kind"><option value="">All Kinds</option></select>
+  <select id="topic"><option value="">All Topics</option></select>
+  <select id="language">
+    <option value="">All languages</option><option value="en">English</option><option value="zh-Hans">简体中文</option>
+    <option value="zh-Hant">繁體中文</option><option value="ja">日本語</option><option value="de">Deutsch</option><option value="other">Other</option>
+  </select>
+  <select id="mode">
+    <option value="">Any Location</option><option value="in_person">In person</option><option value="hybrid">Hybrid</option><option value="online">Online</option>
+  </select>
+  <select id="sort">
+    <option value="score">Highest Score</option><option value="deadline">Soonest deadline</option><option value="new">Newest</option>
+  </select>
+  <label class="toggle"><input type="checkbox" id="saved"> Saved only</label>
+  <label class="toggle"><input type="checkbox" id="openDeadline"> Open deadline</label>
+  <label class="toggle"><input type="checkbox" id="negative"> Show scores below 0</label>
+  <label class="toggle"><input type="checkbox" id="past"> Show Past</label>
+  <label class="toggle"><input type="checkbox" id="dismissed"> Show Dismissed</label>
+</div>
+<p class="count" id="count"></p>
+<main id="list"></main>
+<script>
+const KIND_LABEL = { paper: "Paper", conference: "Conference", workshop: "Workshop", seminar: "Seminar", call: "Call", course: "Course", award: "Award", job: "Job" };
+const MODE_LABEL = { in_person: "In person", hybrid: "Hybrid", online: "Online", unknown: "" };
+let state = { profile: null, items: [] };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+function remember() {
+  try { localStorage.setItem("radar-filters", JSON.stringify(Object.fromEntries(
+    ["kind", "topic", "language", "mode", "sort"].map((k) => [k, $(k).value]).concat(
+    ["saved", "openDeadline", "negative", "past", "dismissed"].map((k) => [k, $(k).checked]))))); } catch {}
+}
+function restore() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("radar-filters") || "{}");
+    for (const [k, v] of Object.entries(saved)) { if (!$(k)) continue; if (typeof v === "boolean") $(k).checked = v; else $(k).value = v; }
+  } catch {}
+}
+
+function when(iso) {
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: state.profile.timezone }).format(new Date(iso));
+}
+function day(iso) {
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(iso + "T00:00:00Z"));
+}
+
+async function load() {
+  const res = await fetch("/api/items");
+  state = await res.json();
+  $("who").textContent = `${state.profile.name} · times in ${state.profile.timezone}`;
+  const kind = $("kind"), topic = $("topic");
+  if (kind.options.length === 1) {
+    for (const [k, label] of Object.entries(KIND_LABEL)) kind.add(new Option(label, k));
+    for (const t of [...state.profile.topics, "Adjacent"]) topic.add(new Option(t, t));
+    restore();
+  }
+  render();
+}
+
+function visible() {
+  const q = $("q").value.trim().toLowerCase();
+  const f = { kind: $("kind").value, topic: $("topic").value, language: $("language").value, mode: $("mode").value };
+  const items = state.items.filter((it) =>
+    (!f.kind || it.kind === f.kind) &&
+    (!f.topic || it.topics.includes(f.topic)) &&
+    (!f.language || it.language === f.language) &&
+    (!f.mode || it.location?.mode === f.mode) &&
+    (!$("saved").checked || it.status !== null) &&
+    (!$("openDeadline").checked || it.nextDeadline) &&
+    ($("negative").checked || it.score >= 0) &&
+    ($("past").checked || !it.past) &&
+    ($("dismissed").checked || !it.dismissed) &&
+    (!q || [it.title, it.summary, it.abstract, it.keynotes.join(" ")].join(" ").toLowerCase().includes(q)));
+  const sort = $("sort").value;
+  items.sort((a, b) =>
+    sort === "deadline" ? (a.nextDeadline ?? "9999").localeCompare(b.nextDeadline ?? "9999") || b.score - a.score :
+    sort === "new" ? b.firstSeenAt.localeCompare(a.firstSeenAt) :
+    b.score - a.score || (a.nextDeadline ?? "9999").localeCompare(b.nextDeadline ?? "9999"));
+  return items;
+}
+
+function card(it) {
+  const statuses = state.profile.statuses[it.kind];
+  const loc = it.location ? [it.location.city, it.location.country, MODE_LABEL[it.location.mode]].filter(Boolean).join(", ") : "";
+  const dates = it.startsOn ? (it.endsOn && it.endsOn !== it.startsOn ? `${day(it.startsOn)} – ${day(it.endsOn)}` : day(it.startsOn)) : "";
+  const next = it.deadlines.find((d) => d.at === it.nextDeadline);
+  const otherDeadlines = it.deadlines.filter((d) => d !== next);
+  return `<article class="${it.dismissed || it.past ? "faded" : ""}" data-id="${it.id}">
+    <div class="score ${it.score >= 4 ? "hi" : it.score < 0 ? "lo" : ""}" title="Score">${it.score > 0 ? "+" : ""}${it.score}</div>
+    <div class="meta"><span class="kind">${KIND_LABEL[it.kind]}</span>${dates ? `<span>${esc(dates)}</span>` : ""}${loc ? `<span>${esc(loc)}</span>` : ""}${it.past ? "<span>Past</span>" : ""}</div>
+    <h2><a href="${esc(it.url)}" target="_blank" rel="noopener" lang="${esc(it.language)}">${esc(it.title)}</a></h2>
+    <div style="grid-column:2;display:grid;gap:6px">
+      <p class="summary">${esc(it.summary)}</p>
+      ${next ? `<div class="deadline">${esc(next.label)}: ${esc(when(next.at))} <span class="meta" style="display:inline">(${esc(next.original)})</span></div>` : ""}
+      ${it.versionNote ? `<div class="note">${esc(it.versionNote)}</div>` : ""}
+      <div class="chips">${it.topics.map((t) => `<span class="chip">${esc(t)}</span>`).join("")}</div>
+      ${it.keynotes.length ? `<div class="meta">Keynotes: ${esc(it.keynotes.join(", "))}</div>` : ""}
+      ${it.abstract || otherDeadlines.length || it.versions.length > 1 ? `<details><summary>More</summary>
+        ${it.abstract ? `<p lang="${esc(it.language)}">${esc(it.abstract)}</p>` : ""}
+        ${otherDeadlines.map((d) => `<div>${esc(d.label)}: ${esc(when(d.at))} (${esc(d.original)})</div>`).join("")}
+        ${it.versions.length > 1 ? `<div>Versions: ${it.versions.map((v) => `<a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.label)}</a>`).join(" · ")}</div>` : ""}
+      </details>` : ""}
+    </div>
+    <div class="actions">
+      <button data-act="save" class="${it.status ? "on" : ""}" title="Save">⭐ ${it.status ? "Saved" : "Save"}</button>
+      <select data-act="status" aria-label="Status"><option value="">No Status</option>${statuses.map((s) => `<option ${it.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>
+      <button data-act="up" class="${it.vote === 1 ? "on" : ""}" title="More like this">👍</button>
+      <button data-act="down" class="${it.vote === -1 ? "on" : ""}" title="Less like this">👎</button>
+      <button data-act="dismiss" class="${it.dismissed ? "on" : ""}" title="Not for me now">${it.dismissed ? "Dismissed" : "Dismiss"}</button>
+    </div>
+  </article>`;
+}
+
+function render() {
+  const items = visible();
+  $("count").textContent = `${items.length} of ${state.items.length} Items`;
+  $("list").innerHTML = items.length ? items.map(card).join("") : `<p class="empty">Nothing matches these filters yet.</p>`;
+}
+
+async function post(id, action, body) {
+  const res = await fetch(`/api/items/${id}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) alert((await res.json()).error);
+  await load();
+}
+
+$("list").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const id = Number(btn.closest("article").dataset.id);
+  const it = state.items.find((x) => x.id === id);
+  if (btn.dataset.act === "save") post(id, "status", { status: it.status ? null : "saved" });
+  if (btn.dataset.act === "up") post(id, "vote", { vote: it.vote === 1 ? null : 1 });
+  if (btn.dataset.act === "down") post(id, "vote", { vote: it.vote === -1 ? null : -1 });
+  if (btn.dataset.act === "dismiss") post(id, "dismiss", { dismissed: !it.dismissed });
+});
+$("list").addEventListener("change", (e) => {
+  if (e.target.dataset.act !== "status") return;
+  post(Number(e.target.closest("article").dataset.id), "status", { status: e.target.value || null });
+});
+for (const id of ["q", "kind", "topic", "language", "mode", "sort", "saved", "openDeadline", "negative", "past", "dismissed"]) {
+  $(id).addEventListener("input", () => { remember(); render(); });
+}
+load();
+</script>
+</body>
+</html>

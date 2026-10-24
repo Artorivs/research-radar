@@ -1,0 +1,64 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type Anthropic from "@anthropic-ai/sdk";
+import { claudeAssessor, DEFAULT_MODEL, systemPrompt } from "../src/assess.ts";
+import type { Entry } from "../src/sources/entry.ts";
+import { item, testProfile } from "./helpers.ts";
+
+const entry: Entry = {
+  source: "blog",
+  entryId: "1",
+  url: "https://blog.example/1",
+  title: "Call for papers",
+  text: "Abstracts due 1 December 2026.",
+  publishedAt: "2026-10-20T00:00:00Z",
+  paper: null,
+};
+
+/** A stand-in for the SDK client that records the request and returns a canned response. */
+function stubClient(response: Record<string, unknown>) {
+  const requests: Array<Record<string, unknown>> = [];
+  const client = { messages: { parse: async (req: Record<string, unknown>) => (requests.push(req), response) } };
+  return { client: client as unknown as Anthropic, requests };
+}
+
+test("the system prompt carries the Profile's Topics, the rubric and Oxford spelling", () => {
+  const prompt = systemPrompt(testProfile());
+  assert.match(prompt, /- International law: Public international law/);
+  assert.match(prompt, /- Adjacent:/);
+  assert.match(prompt, /\+9 to \+10/);
+  assert.match(prompt, /-ize endings/);
+  assert.match(prompt, /Never call it a webinar/);
+});
+
+test("the assessor sends a cached system prompt, low effort and the Votes, and returns the parsed Items", async () => {
+  const parsed = { items: [item({ kind: "call", title: "Call for papers" })] };
+  const { client, requests } = stubClient({ stop_reason: "end_turn", parsed_output: parsed });
+  const assess = claudeAssessor(testProfile(), client);
+  const items = await assess(entry, [{ kind: "paper", title: "A paper I liked", vote: 1 }]);
+
+  assert.deepEqual(items, parsed.items);
+  const req = requests[0]!;
+  assert.equal(req.model, DEFAULT_MODEL);
+  assert.equal((req.output_config as { effort: string }).effort, "low");
+  assert.deepEqual((req.system as Array<{ cache_control: unknown }>)[0]!.cache_control, { type: "ephemeral" });
+  const user = (req.messages as Array<{ content: string }>)[0]!.content;
+  assert.match(user, /👍 \[paper\] A paper I liked/);
+  assert.match(user, /Feed Entry from blog/);
+});
+
+test("a refusal yields no Items rather than an error", async () => {
+  const { client } = stubClient({ stop_reason: "refusal", stop_details: { category: null }, parsed_output: null });
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    assert.deepEqual(await claudeAssessor(testProfile(), client)(entry, []), []);
+  } finally {
+    console.warn = warn;
+  }
+});
+
+test("a truncated response is an error, so the Entry is retried next run", async () => {
+  const { client } = stubClient({ stop_reason: "max_tokens", parsed_output: null });
+  await assert.rejects(claudeAssessor(testProfile(), client)(entry, []), /cut off/);
+});

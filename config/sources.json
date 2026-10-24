@@ -1,0 +1,15 @@
+{
+  "openalex": {
+    "enabled": true,
+    "mailto": "",
+    "lookbackDays": 30,
+    "perQuery": 25
+  },
+  "feeds": [
+    { "id": "ejiltalk", "name": "EJIL:Talk!", "url": "https://www.ejiltalk.org/feed/" },
+    { "id": "opiniojuris", "name": "Opinio Juris", "url": "https://opiniojuris.org/feed/" },
+    { "id": "verfassungsblog", "name": "Verfassungsblog", "url": "https://verfassungsblog.de/feed/" },
+    { "id": "voelkerrechtsblog", "name": "Völkerrechtsblog", "url": "https://voelkerrechtsblog.org/feed/" },
+    { "id": "strasbourgobservers", "name": "Strasbourg Observers", "url": "https://strasbourgobservers.com/feed/" }
+  ]
+}

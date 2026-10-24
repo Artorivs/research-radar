@@ -1,0 +1,152 @@
+/**
+ * One collection run: read every Source, skip Entries already seen, assess the rest, and file the
+ * resulting Items into the Store, merging duplicates and new Versions into what is already there.
+ */
+import type { Assessor, AssessedItem } from "./assess.ts";
+import type { Profile, SourcesConfig } from "./config.ts";
+import { isEvent, seriesKeyFor, type Deadline, type Kind } from "./domain.ts";
+import type { Entry, Fetch } from "./sources/entry.ts";
+import { readFeed } from "./sources/feed.ts";
+import { readOpenAlex } from "./sources/openalex.ts";
+import type { NewItem, Store } from "./store.ts";
+
+/** How far a net 👍 or 👎 on earlier Events in a Series moves a new Event's Score. */
+export const SERIES_VOTE_SHIFT = 2;
+const CALIBRATION_VOTES = 30;
+
+export interface RunReport {
+  entriesRead: number;
+  entriesAssessed: number;
+  itemsAdded: number;
+  itemsMerged: number;
+  versionsAdded: number;
+  /** New Entries held back by limitPerSource; they are read on a later run. */
+  entriesDeferred: number;
+  failures: string[];
+}
+
+export interface RunDeps {
+  profile: Profile;
+  sources: SourcesConfig;
+  store: Store;
+  assess: Assessor;
+  fetch: Fetch;
+  now: Date;
+  /** Caps how many new Entries each Source contributes per run, for a cheap first try. */
+  limitPerSource?: number;
+  log?: (line: string) => void;
+}
+
+export async function collect(deps: RunDeps): Promise<RunReport> {
+  const { profile, sources, store, fetch, now } = deps;
+  const log = deps.log ?? (() => {});
+  const report: RunReport = { entriesRead: 0, entriesAssessed: 0, itemsAdded: 0, itemsMerged: 0, versionsAdded: 0, entriesDeferred: 0, failures: [] };
+
+  const readers: Array<[string, () => Promise<Entry[]>]> = [
+    ["OpenAlex", () => readOpenAlex(profile, sources.openalex, fetch, now)],
+    ...sources.feeds.map((feed): [string, () => Promise<Entry[]>] => [feed.name, () => readFeed(feed, fetch)]),
+  ];
+
+  for (const [name, read] of readers) {
+    let entries: Entry[];
+    try {
+      entries = await read();
+    } catch (error) {
+      report.failures.push(`${name}: ${describe(error)}`);
+      continue;
+    }
+    const unseen = entries.filter((e) => e.entryId && !store.hasSeen(e.source, e.entryId));
+    const fresh = unseen.slice(0, deps.limitPerSource ?? Infinity);
+    report.entriesRead += entries.length;
+    report.entriesDeferred += unseen.length - fresh.length;
+    log(`${name}: ${entries.length} entries, ${unseen.length} new`);
+    for (const entry of fresh) {
+      try {
+        await fileEntry(entry, deps, report);
+        store.markSeen(entry.source, entry.entryId, now);
+      } catch (error) {
+        report.failures.push(`${name} "${entry.title}": ${describe(error)}`);
+      }
+    }
+  }
+  return report;
+}
+
+async function fileEntry(entry: Entry, deps: RunDeps, report: RunReport): Promise<void> {
+  const { profile, store, now } = deps;
+  const version = { source: entry.source, url: entry.url, label: entry.paper?.versionLabel ?? entry.source, seenAt: now.toISOString() };
+
+  // A Paper already in the archive gains a Version instead of a second assessment.
+  if (entry.paper) {
+    const existing = store.findPaper(entry.paper.doi, entry.title);
+    if (existing !== null) {
+      if (store.addVersion(existing, version)) {
+        report.versionsAdded++;
+        store.noteNewVersion(existing, profile.id, `now ${entry.paper.versionLabel}`);
+      }
+      return;
+    }
+  }
+
+  const assessed = await deps.assess(entry, store.recentVotes(profile.id, CALIBRATION_VOTES));
+  report.entriesAssessed++;
+
+  for (const raw of assessed) {
+    const item = toNewItem(raw, entry);
+    const existing =
+      item.kind === "paper" ? store.findPaper(item.doi, item.title) : store.findOpportunity(item.kind, item.title, item.startsOn);
+    const id = existing ?? store.insertItem(item, now);
+    if (existing === null) report.itemsAdded++;
+    else {
+      report.itemsMerged++;
+      store.fillGaps(existing, item);
+    }
+    store.addDeadlines(id, validDeadlines(raw.deadlines));
+    store.addVersion(id, version);
+    if (!store.hasJudgement(id, profile.id)) {
+      const seriesShift = item.seriesKey ? Math.sign(store.seriesVote(profile.id, item.seriesKey)) * SERIES_VOTE_SHIFT : 0;
+      store.saveJudgement(id, profile.id, clampScore(raw.score + seriesShift), [...new Set(raw.topics)]);
+    }
+  }
+
+  function toNewItem(raw: AssessedItem, from: Entry): NewItem {
+    const kind: Kind = from.paper ? "paper" : raw.kind;
+    return {
+      kind,
+      title: from.paper ? from.title : raw.title.trim() || from.title,
+      summary: raw.summary.trim(),
+      abstract: from.paper ? from.text : raw.description.trim(),
+      language: raw.language,
+      url: from.url,
+      doi: from.paper?.doi ?? null,
+      keynotes: raw.keynotes,
+      location: isEvent(kind) ? raw.location : null,
+      startsOn: isoDate(raw.startsOn),
+      endsOn: isoDate(raw.endsOn),
+      seriesKey: isEvent(kind) ? seriesKeyFor(raw.title) || null : null,
+      callForEventId: kind === "call" && raw.callForEvent ? store.findEventByTitle(raw.callForEvent) : null,
+    };
+  }
+}
+
+/** fetch() reports network trouble as "fetch failed" with the real reason in `cause`. */
+function describe(error: unknown): string {
+  const { message, cause } = error as Error & { cause?: { code?: string; message?: string } };
+  const reason = cause?.code ?? cause?.message;
+  return reason ? `${message} (${reason})` : message;
+}
+
+export function clampScore(score: number): number {
+  return Math.max(-10, Math.min(10, Math.round(score)));
+}
+
+function isoDate(value: string | null): string | null {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+function validDeadlines(deadlines: AssessedItem["deadlines"]): Deadline[] {
+  return deadlines.flatMap((d) => {
+    const at = new Date(d.at);
+    return Number.isNaN(at.getTime()) ? [] : [{ label: d.label, type: d.type, at: at.toISOString(), original: d.original }];
+  });
+}
