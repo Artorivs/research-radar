@@ -1,5 +1,6 @@
 /**
  * Reads recent Papers from OpenAlex (https://docs.openalex.org), one search per Topic query.
+ * Searches are billed against a small free daily allowance, which a free API key raises tenfold.
  */
 import type { Profile, SourcesConfig } from "../config.ts";
 import type { Entry, Fetch } from "./entry.ts";
@@ -35,7 +36,15 @@ export async function readOpenAlex(
     url.searchParams.set("sort", "publication_date:desc");
     url.searchParams.set("per-page", String(config.perQuery));
     if (config.mailto) url.searchParams.set("mailto", config.mailto);
+    if (config.apiKey) url.searchParams.set("api_key", config.apiKey);
     const res = await fetch(url.toString());
+    if (res.status === 429) {
+      throw new Error(
+        config.apiKey
+          ? `OpenAlex's daily allowance for your key is used up (429); Papers are read again on the next run`
+          : `OpenAlex's daily allowance without a key is used up (429). A free key raises it tenfold: see "OpenAlex key" in the README`,
+      );
+    }
     if (!res.ok) throw new Error(`OpenAlex returned ${res.status} for "${query}"`);
     const body = JSON.parse(await res.text()) as { results: OpenAlexWork[] };
     for (const work of body.results) {

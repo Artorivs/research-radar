@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { withOpenAlexKey } from "../src/config.ts";
+import type { Fetch } from "../src/sources/entry.ts";
 import { parseFeed } from "../src/sources/feed.ts";
 import { abstractFrom, readOpenAlex } from "../src/sources/openalex.ts";
 import { fakeFetch, fixture, NOW, testProfile, testSources } from "./helpers.ts";
@@ -31,6 +33,18 @@ test("OpenAlex works become Paper Entries, skipping datasets", async () => {
   const asked = new URL(fetch.calls[0]!);
   assert.equal(asked.searchParams.get("search"), "international law");
   assert.equal(asked.searchParams.get("filter"), "from_publication_date:2026-09-24");
+});
+
+test("an OpenAlex key from .env is sent with each search, and a used-up allowance says how to fix it", async () => {
+  const fetch = fakeFetch({ "https://api.openalex.org/works": fixture("openalex.json") });
+  const sources = withOpenAlexKey(testSources(), "k123");
+  await readOpenAlex(testProfile(), sources.openalex, fetch, NOW);
+  assert.equal(new URL(fetch.calls[0]!).searchParams.get("api_key"), "k123");
+  assert.equal(withOpenAlexKey(testSources(), undefined).openalex.apiKey, undefined);
+
+  const limited: Fetch = async () => ({ ok: false, status: 429, text: async () => "" });
+  await assert.rejects(readOpenAlex(testProfile(), testSources().openalex, limited, NOW), /without a key is used up \(429\).*README/);
+  await assert.rejects(readOpenAlex(testProfile(), sources.openalex, limited, NOW), /for your key is used up/);
 });
 
 test("abstracts are rebuilt from OpenAlex's inverted index", () => {

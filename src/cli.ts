@@ -7,7 +7,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { loadProfile, loadSources } from "./config.ts";
+import { loadProfile, loadSources, withOpenAlexKey } from "./config.ts";
 import { chooseAssessor } from "./provider.ts";
 import { collect } from "./radar.ts";
 import { startServer } from "./server.ts";
@@ -38,7 +38,7 @@ switch (positionals[0]) {
     console.log(`Assessing with ${provider} (${model})`);
     const report = await collect({
       profile,
-      sources: loadSources(values.sources),
+      sources: withOpenAlexKey(loadSources(values.sources), process.env.OPENALEX_API_KEY),
       store,
       assess,
       fetch: fetch as Fetch,
