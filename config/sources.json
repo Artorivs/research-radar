@@ -10,6 +10,13 @@
     { "id": "opiniojuris", "name": "Opinio Juris", "url": "https://opiniojuris.org/feed/" },
     { "id": "verfassungsblog", "name": "Verfassungsblog", "url": "https://verfassungsblog.de/feed/" },
     { "id": "voelkerrechtsblog", "name": "Völkerrechtsblog", "url": "https://voelkerrechtsblog.org/feed/" },
-    { "id": "strasbourgobservers", "name": "Strasbourg Observers", "url": "https://strasbourgobservers.com/feed/" }
+    { "id": "strasbourgobservers", "name": "Strasbourg Observers", "url": "https://strasbourgobservers.com/feed/" },
+    { "id": "iconnect-cfp", "name": "I-CONnect: calls for papers", "url": "https://www.iconnectblog.com/category/announcements-call-for-papers/feed/" },
+    { "id": "esil", "name": "ESIL news", "url": "https://esil-sedi.eu/feed/" },
+    { "id": "ukconstitutionallaw", "name": "UK Constitutional Law Association", "url": "https://ukconstitutionallaw.org/feed/" },
+    { "id": "ohrh", "name": "Oxford Human Rights Hub", "url": "https://ohrh.law.ox.ac.uk/feed/" },
+    { "id": "juwiss", "name": "JuWissBlog", "url": "https://www.juwiss.de/feed/" },
+    { "id": "wikicfp-law", "name": "WikiCFP: law", "url": "http://www.wikicfp.com/cfp/rss?cat=law" },
+    { "id": "wechat", "name": "WeChat Public Accounts", "url": "http://localhost:4000/feeds/all.atom", "enabled": false }
   ]
 }

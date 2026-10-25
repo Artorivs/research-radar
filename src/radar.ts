@@ -46,7 +46,7 @@ export async function collect(deps: RunDeps): Promise<RunReport> {
 
   const readers: Array<[string, () => Promise<Entry[]>]> = [
     ["OpenAlex", () => readOpenAlex(profile, sources.openalex, fetch, now)],
-    ...sources.feeds.map((feed): [string, () => Promise<Entry[]>] => [feed.name, () => readFeed(feed, fetch)]),
+    ...sources.feeds.filter((feed) => feed.enabled !== false).map((feed): [string, () => Promise<Entry[]>] => [feed.name, () => readFeed(feed, fetch)]),
   ];
 
   for (const [name, read] of readers) {
@@ -142,6 +142,26 @@ async function fileEntry(entry: Entry, deps: RunDeps, report: RunReport): Promis
       callForEventId: kind === "call" && raw.callForEvent ? store.findEventByTitle(raw.callForEvent) : null,
     };
   }
+}
+
+/**
+ * One line per feed saying whether it can be read, for checking a new feed address before a collect run.
+ * Reads only; nothing is assessed or stored.
+ */
+export async function checkFeeds(feeds: SourcesConfig["feeds"], fetch: Fetch): Promise<string[]> {
+  return Promise.all(
+    feeds.map(async (feed) => {
+      if (feed.enabled === false) return `–  ${feed.name}: switched off ("enabled": false)`;
+      try {
+        const entries = await readFeed(feed, fetch);
+        if (entries.length === 0) return `?  ${feed.name}: no posts found; the address may be a web page rather than a feed`;
+        const newest = entries.map((e) => e.publishedAt ?? "").sort().at(-1)?.slice(0, 10);
+        return `✓  ${feed.name}: ${entries.length} posts${newest ? `, newest ${newest}` : ""}`;
+      } catch (error) {
+        return `✗  ${feed.name}: ${describe(error)}`;
+      }
+    }),
+  );
 }
 
 /** fetch() reports network trouble as "fetch failed" with the real reason in `cause`. */
