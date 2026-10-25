@@ -22,7 +22,7 @@
     {
       "name": "Computational law",
       "description": "Computational legal studies, computational law, legal informatics, AI and law, legal NLP, quantitative text analysis of legal materials.",
-      "queries": ["computational legal studies", "computational law", "legal informatics", "artificial intelligence and law", "法律人工智能", "Rechtsinformatik"]
+      "queries": ["computational legal studies", "computational law", "legal informatics", "legal network analysis", "jurimetrics", "artificial intelligence and law", "法律人工智能", "Rechtsinformatik"]
     },
     {
       "name": "Public inquiry",
