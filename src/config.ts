@@ -37,6 +37,13 @@ const SourcesSchema = z.object({
     /** A free OpenAlex API key, which raises the daily allowance tenfold. Set OPENALEX_API_KEY in .env, not here. */
     apiKey: z.string().optional(),
     lookbackDays: z.number().int().positive(),
+    /**
+     * Papers whose venue name contains any of these (ignoring case) are skipped: open-upload sites with no
+     * editorial or peer review, such as Zenodo. Papers already filed from them are removed unless saved.
+     */
+    excludeVenues: z.array(z.string().min(1)).default([]),
+    /** Skips fully open-access journals that neither the DOAJ nor the CWTS core list vouches for: the usual mark of a predatory journal. */
+    skipUnvettedOpenAccessJournals: z.boolean().default(true),
     perQuery: z.number().int().positive().max(200),
   }),
   feeds: z.array(

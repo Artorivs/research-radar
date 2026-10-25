@@ -7,7 +7,7 @@ import type { Profile, SourcesConfig } from "./config.ts";
 import { isEvent, seriesKeyFor, type Deadline, type Kind } from "./domain.ts";
 import type { Entry, Fetch } from "./sources/entry.ts";
 import { readFeed } from "./sources/feed.ts";
-import { readOpenAlex } from "./sources/openalex.ts";
+import { isExcludedVenue, readOpenAlex } from "./sources/openalex.ts";
 import type { NewItem, Store } from "./store.ts";
 
 /** How far a net 👍 or 👎 on earlier Events in a Series moves a new Event's Score. */
@@ -43,6 +43,12 @@ export async function collect(deps: RunDeps): Promise<RunReport> {
   const { profile, sources, store, fetch, now } = deps;
   const log = deps.log ?? (() => {});
   const report: RunReport = { entriesRead: 0, entriesAssessed: 0, itemsAdded: 0, itemsMerged: 0, versionsAdded: 0, entriesDeferred: 0, failures: [], stopped: null };
+
+  // "Preprint" and "Published version" alone are the labels of Papers that came with no venue at all.
+  const removed = store.removePapersOnlyFrom(
+    (label) => label === "Preprint" || label === "Published version" || isExcludedVenue(label, sources.openalex.excludeVenues),
+  );
+  if (removed > 0) log(`Removed ${removed} ${removed === 1 ? "Paper" : "Papers"} from excluded or unknown venues (see excludeVenues in config/sources.json)`);
 
   const readers: Array<[string, () => Promise<Entry[]>]> = [
     ["OpenAlex", () => readOpenAlex(profile, sources.openalex, fetch, now)],

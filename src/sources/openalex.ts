@@ -14,7 +14,16 @@ interface OpenAlexWork {
   abstract_inverted_index: Record<string, number[]> | null;
   primary_location: {
     landing_page_url: string | null;
-    source: { display_name: string | null } | null;
+    source: {
+      display_name: string | null;
+      type?: string | null;
+      /** Every work in the venue is open access. */
+      is_oa?: boolean | null;
+      /** Listed in the Directory of Open Access Journals, which vets open-access journals. */
+      is_in_doaj?: boolean | null;
+      /** On the CWTS core list of established sources behind the Leiden Ranking. */
+      is_core?: boolean | null;
+    } | null;
   } | null;
 }
 
@@ -48,17 +57,20 @@ export async function readOpenAlex(
     if (!res.ok) throw new Error(`OpenAlex returned ${res.status} for "${query}"`);
     const body = JSON.parse(await res.text()) as { results: OpenAlexWork[] };
     for (const work of body.results) {
-      const entry = toEntry(work);
+      const entry = toEntry(work, config.excludeVenues, config.skipUnvettedOpenAccessJournals);
       if (entry) byId.set(entry.entryId, entry);
     }
   }
   return [...byId.values()];
 }
 
-function toEntry(work: OpenAlexWork): Entry | null {
+function toEntry(work: OpenAlexWork, excludeVenues: string[], skipUnvetted: boolean): Entry | null {
   if (!work.display_name || (work.type && !WANTED_TYPES.has(work.type))) return null;
   const doi = work.doi ? work.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").toLowerCase() : null;
   const venue = work.primary_location?.source?.display_name ?? null;
+  // A work with no known venue is almost always an uploaded file with nothing vouching for it.
+  if (!venue || isExcludedVenue(venue, excludeVenues)) return null;
+  if (skipUnvetted && isUnvettedOpenAccessJournal(work.primary_location!.source!)) return null;
   return {
     source: "openalex",
     entryId: work.id,
@@ -72,6 +84,19 @@ function toEntry(work: OpenAlexWork): Entry | null {
       versionLabel: work.type === "preprint" ? `Preprint${venue ? ` (${venue})` : ""}` : (venue ?? "Published version"),
     },
   };
+}
+
+/**
+ * The mark of a likely predatory journal: fully open access, yet vetted neither by the DOAJ nor by the CWTS
+ * core list. Subscription and hybrid journals, DOAJ journals and repositories such as SSRN are unaffected.
+ */
+export function isUnvettedOpenAccessJournal(source: NonNullable<NonNullable<OpenAlexWork["primary_location"]>["source"]>): boolean {
+  return source.type === "journal" && source.is_oa === true && source.is_in_doaj === false && source.is_core !== true;
+}
+
+export function isExcludedVenue(venue: string, excludeVenues: string[]): boolean {
+  const name = venue.toLowerCase();
+  return excludeVenues.some((v) => name.includes(v.toLowerCase()));
 }
 
 /** OpenAlex ships abstracts as word → positions; put the words back in order. */

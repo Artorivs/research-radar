@@ -3,6 +3,7 @@
  *
  *   npm run radar -- collect [--limit N] [--provider claude|ollama]   read every Source and file new Items
  *   npm run radar -- sources   check that every feed in config/sources.json can be read
+ *   npm run radar -- forget-papers   drop unsaved Papers so the next collect refilters them
  *   npm run radar -- serve [--port 4747]   open the dashboard at http://localhost:4747
  */
 import { mkdirSync } from "node:fs";
@@ -64,6 +65,12 @@ switch (positionals[0]) {
     store.close();
     break;
   }
+  case "forget-papers": {
+    const removed = store.forgetPapers();
+    console.log(`Removed ${removed} Papers you hadn't saved, voted on or dismissed. The next collect reads OpenAlex afresh through the current filters.`);
+    store.close();
+    break;
+  }
   case "serve": {
     const port = Number(values.port);
     startServer(store, profile, port);
@@ -71,6 +78,6 @@ switch (positionals[0]) {
     break;
   }
   default:
-    console.log("Usage: npm run radar -- collect [--limit N] [--provider claude|ollama] | sources | serve [--port 4747]");
+    console.log("Usage: npm run radar -- collect [--limit N] [--provider claude|ollama] | sources | forget-papers | serve [--port 4747]");
     process.exitCode = positionals[0] ? 1 : 0;
 }

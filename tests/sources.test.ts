@@ -24,7 +24,7 @@ test("Atom entries become Entries", () => {
   assert.equal(entry!.text, "Beiträge bis 31. März 2027.");
 });
 
-test("OpenAlex works become Paper Entries, skipping datasets", async () => {
+test("OpenAlex works become Paper Entries, skipping datasets, excluded venues such as Zenodo, and works with no venue", async () => {
   const fetch = fakeFetch({ "https://api.openalex.org/works": fixture("openalex.json") });
   const entries = await readOpenAlex(testProfile(), testSources().openalex, fetch, NOW);
   assert.equal(entries.length, 1);
@@ -33,6 +33,29 @@ test("OpenAlex works become Paper Entries, skipping datasets", async () => {
   const asked = new URL(fetch.calls[0]!);
   assert.equal(asked.searchParams.get("search"), "international law");
   assert.equal(asked.searchParams.get("filter"), "from_publication_date:2026-09-24");
+});
+
+test("fully open-access journals that neither the DOAJ nor the CWTS core list vouches for are skipped", async () => {
+  const work = (id: string, source: Record<string, unknown>) => ({
+    id, doi: null, display_name: `Paper ${id}`, publication_date: "2026-10-05", type: "article", abstract_inverted_index: null,
+    primary_location: { landing_page_url: `https://example.org/${id}`, source: { display_name: `Venue ${id}`, ...source } },
+  });
+  const body = JSON.stringify({
+    results: [
+      work("predatory", { type: "journal", is_oa: true, is_in_doaj: false, is_core: false }),
+      work("doaj", { type: "journal", is_oa: true, is_in_doaj: true, is_core: false }),
+      work("subscription", { type: "journal", is_oa: false, is_in_doaj: false, is_core: false }),
+      work("core-oa", { type: "journal", is_oa: true, is_in_doaj: false, is_core: true }),
+      work("ssrn", { type: "repository", is_oa: true, is_in_doaj: false, is_core: false }),
+      work("no-flags", {}),
+    ],
+  });
+  const fetch = fakeFetch({ "https://api.openalex.org/works": body });
+  const kept = (await readOpenAlex(testProfile(), testSources().openalex, fetch, NOW)).map((e) => e.title);
+  assert.deepEqual(kept.sort(), ["Paper core-oa", "Paper doaj", "Paper no-flags", "Paper ssrn", "Paper subscription"]);
+
+  const all = await readOpenAlex(testProfile(), { ...testSources().openalex, skipUnvettedOpenAccessJournals: false }, fetch, NOW);
+  assert.equal(all.length, 6);
 });
 
 test("an OpenAlex key from .env is sent with each search, and a used-up allowance says how to fix it", async () => {
