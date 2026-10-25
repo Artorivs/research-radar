@@ -11,7 +11,7 @@
     { "id": "verfassungsblog", "name": "Verfassungsblog", "url": "https://verfassungsblog.de/feed/" },
     { "id": "voelkerrechtsblog", "name": "Völkerrechtsblog", "url": "https://voelkerrechtsblog.org/feed/" },
     { "id": "strasbourgobservers", "name": "Strasbourg Observers", "url": "https://strasbourgobservers.com/feed/" },
-    { "id": "iconnect-cfp", "name": "I-CONnect: calls for papers", "url": "https://www.iconnectblog.com/category/announcements-call-for-papers/feed/" },
+    { "id": "iconnect", "name": "I-CONnect", "url": "https://www.iconnectblog.com/feed/" },
     { "id": "esil", "name": "ESIL news", "url": "https://esil-sedi.eu/feed/" },
     { "id": "ukconstitutionallaw", "name": "UK Constitutional Law Association", "url": "https://ukconstitutionallaw.org/feed/" },
     { "id": "ohrh", "name": "Oxford Human Rights Hub", "url": "https://ohrh.law.ox.ac.uk/feed/" },
