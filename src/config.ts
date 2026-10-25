@@ -39,7 +39,7 @@ const SourcesSchema = z.object({
     lookbackDays: z.number().int().positive(),
     /**
      * Papers whose venue name contains any of these (ignoring case) are skipped: open-upload sites with no
-     * editorial or peer review, such as Zenodo. Papers already filed from them are removed unless saved.
+     * editorial or peer review, such as Zenodo.
      */
     excludeVenues: z.array(z.string().min(1)).default([]),
     /** Skips fully open-access journals that neither the DOAJ nor the CWTS core list vouches for: the usual mark of a predatory journal. */

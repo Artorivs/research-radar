@@ -128,48 +128,6 @@ export class Store {
       .run(source, entryId, now.toISOString());
   }
 
-  /**
-   * Removes Papers known only from excluded venues, along with their Deadlines, Versions and judgements.
-   * Papers anyone has saved, or that also have a Version elsewhere, stay. Returns how many were removed.
-   */
-  removePapersOnlyFrom(isExcluded: (versionLabel: string) => boolean): number {
-    const papers = this.#db
-      .prepare(
-        `SELECT i.id, json_group_array(v.label) AS labels FROM items i JOIN versions v ON v.item_id = i.id
-         WHERE i.kind = 'paper' AND NOT EXISTS (SELECT 1 FROM judgements j WHERE j.item_id = i.id AND j.status IS NOT NULL)
-         GROUP BY i.id`,
-      )
-      .all() as Row[];
-    const doomed = papers.filter((p) => (JSON.parse(String(p.labels)) as string[]).every(isExcluded)).map((p) => Number(p.id));
-    this.#remove(doomed);
-    return doomed.length;
-  }
-
-  /**
-   * Removes every Paper nobody has saved, voted on or dismissed, and forgets which OpenAlex records were
-   * read, so the next run reads them again through the current filters. Returns how many were removed.
-   */
-  forgetPapers(): number {
-    const ids = (
-      this.#db
-        .prepare(
-          `SELECT i.id FROM items i WHERE i.kind = 'paper' AND NOT EXISTS (
-             SELECT 1 FROM judgements j WHERE j.item_id = i.id AND (j.status IS NOT NULL OR j.vote IS NOT NULL OR j.dismissed = 1))`,
-        )
-        .all() as Row[]
-    ).map((r) => Number(r.id));
-    this.#remove(ids);
-    this.#db.prepare("DELETE FROM seen_entries WHERE source = 'openalex'").run();
-    return ids.length;
-  }
-
-  #remove(ids: number[]): void {
-    for (const id of ids) {
-      for (const table of ["deadlines", "versions", "judgements"]) this.#db.prepare(`DELETE FROM ${table} WHERE item_id = ?`).run(id);
-      this.#db.prepare("DELETE FROM items WHERE id = ?").run(id);
-    }
-  }
-
   /** The existing Paper with this DOI or title, if any. */
   findPaper(doi: string | null, title: string): number | null {
     if (doi) {

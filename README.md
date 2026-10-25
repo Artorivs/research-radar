@@ -117,16 +117,6 @@ three filters in [config/sources.json](config/sources.json) drop the worst of it
   Access Journals or the CWTS core list (the journals behind the Leiden Ranking) vouches for it. That is
   the usual mark of a predatory journal. Subscription journals and SSRN are unaffected.
 
-Papers already filed from an excluded or unknown venue are removed at the start of the next collect,
-unless you saved them. To run every earlier Paper through the filters again, use:
-
-```sh
-npm run radar -- forget-papers
-```
-
-This removes the Papers you haven't saved, voted on or dismissed; the next collect reads OpenAlex afresh
-and reassesses only the records that pass.
-
 ### OpenAlex key
 
 OpenAlex bills each search against a small free daily allowance. A collect run makes one search per
