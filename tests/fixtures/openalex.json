@@ -17,6 +17,24 @@
       "type": "dataset",
       "abstract_inverted_index": null,
       "primary_location": null
+    },
+    {
+      "id": "https://openalex.org/W3",
+      "doi": "https://doi.org/10.5281/zenodo.1",
+      "display_name": "An uploaded essay on international law",
+      "publication_date": "2026-10-03",
+      "type": "article",
+      "abstract_inverted_index": null,
+      "primary_location": { "landing_page_url": "https://zenodo.org/records/1", "source": { "display_name": "Zenodo (CERN European Organization for Nuclear Research)" } }
+    },
+    {
+      "id": "https://openalex.org/W4",
+      "doi": null,
+      "display_name": "A file with no venue",
+      "publication_date": "2026-10-04",
+      "type": "article",
+      "abstract_inverted_index": null,
+      "primary_location": { "landing_page_url": "https://example.org/file.pdf", "source": null }
     }
   ]
 }

@@ -105,6 +105,18 @@ WeWe RSS is an unofficial tool kept up by one person. The WeChat Reading login l
 the check shows ✗ or the feed stops updating, scan the QR code again. Docker must be running at collect
 time (07:00 if you use the launchd job).
 
+### Paper quality filters
+
+OpenAlex indexes almost everything, including uploads nobody has reviewed. Before the model sees a Paper,
+three filters in [config/sources.json](config/sources.json) drop the worst of it:
+
+- **No venue:** a record with no known journal or repository is skipped.
+- **`excludeVenues`:** a record whose venue name contains any of these words is skipped. The list starts
+  with open-upload sites such as Zenodo, Figshare and ResearchGate. Add any journal you never want to see.
+- **`skipUnvettedOpenAccessJournals`:** a fully open-access journal is skipped unless the Directory of Open
+  Access Journals or the CWTS core list (the journals behind the Leiden Ranking) vouches for it. That is
+  the usual mark of a predatory journal. Subscription journals and SSRN are unaffected.
+
 ### OpenAlex key
 
 OpenAlex bills each search against a small free daily allowance. A collect run makes one search per
