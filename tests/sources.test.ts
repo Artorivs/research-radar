@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { withOpenAlexKey } from "../src/config.ts";
 import type { Fetch } from "../src/sources/entry.ts";
 import { parseFeed } from "../src/sources/feed.ts";
+import { pageEntry, readPage } from "../src/sources/page.ts";
 import { abstractFrom, readOpenAlex } from "../src/sources/openalex.ts";
 import { fakeFetch, fixture, NOW, testProfile, testSources } from "./helpers.ts";
 
@@ -73,4 +74,28 @@ test("an OpenAlex key from .env is sent with each search, and a used-up allowanc
 test("abstracts are rebuilt from OpenAlex's inverted index", () => {
   assert.equal(abstractFrom({ law: [1], International: [0], matters: [2] }), "International law matters");
   assert.equal(abstractFrom(null), "");
+});
+
+const ASLI = { id: "asli", name: "Asian Law Institute conference", url: "https://law.example/asli/call_for_papers.html" };
+
+test("a web page becomes one Entry, titled by its heading, without menus or footer", async () => {
+  const fetch = fakeFetch({ [ASLI.url]: fixture("call.html") });
+  const [entry] = await readPage(ASLI, fetch, NOW);
+
+  assert.equal(entry!.title, "Call for Papers: 24th Asian Law Institute Conference");
+  assert.equal(entry!.kind, "page");
+  assert.equal(entry!.source, "asli");
+  assert.equal(entry!.publishedAt, NOW.toISOString());
+  assert.match(entry!.text, /Abstracts of no more than 500 words should be submitted by 15 December 2026/);
+  assert.match(entry!.text, /28–29 May 2027/, "entities are decoded");
+  assert.doesNotMatch(entry!.text, /Home|About the Institute|All rights reserved/);
+  assert.doesNotMatch(entry!.text, /24th ASLI Conference \|/, "the <title> is not repeated in the text");
+});
+
+test("a page is one Entry while its text holds, and a new Entry once the text changes", () => {
+  const html = fixture("call.html");
+  assert.equal(pageEntry(ASLI, html, NOW).entryId, pageEntry(ASLI, html, new Date("2027-01-01T00:00:00Z")).entryId);
+  const later = html.replace("15 December 2026", "31 January 2027");
+  assert.notEqual(pageEntry(ASLI, later, NOW).entryId, pageEntry(ASLI, html, NOW).entryId);
+  assert.match(pageEntry(ASLI, html, NOW).entryId, /^https:\/\/law\.example\/asli\/call_for_papers\.html#[0-9a-f]{16}$/);
 });

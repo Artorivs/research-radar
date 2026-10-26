@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { StopRun } from "../src/assess.ts";
-import { checkFeeds, collect, type RunDeps } from "../src/radar.ts";
+import { checkSources, collect, type RunDeps } from "../src/radar.ts";
 import { Store } from "../src/store.ts";
 import { fakeAssessor, fakeFetch, fixture, item, NOW, testProfile, testSources } from "./helpers.ts";
 
@@ -181,14 +181,46 @@ test("a switched-off feed is not read", async () => {
   assert.equal(report.entriesRead, 0);
 });
 
-test("checking feeds reports which can be read, which are web pages, which fail and which are off", async () => {
-  const fetch = fakeFetch({ "https://blog.example/feed/": fixture("blog.rss.xml"), "https://page.example/": "<html><body>Hello</body></html>" });
-  const lines = await checkFeeds(
-    [BLOG, { id: "page", name: "Page", url: "https://page.example/" }, { id: "gone", name: "Gone", url: "https://gone.example/feed/" }, { id: "wechat", name: "WeChat", url: "http://localhost:4000/feeds/all.atom", enabled: false }],
-    fetch,
-  );
+
+test("a page Source is collected like a feed, and the prompt says it is a page", async () => {
+  const PAGE = { id: "asli", name: "ASLI conference", url: "https://law.example/call.html" };
+  const call = item({ kind: "conference", title: "24th Asian Law Institute Conference", score: 8 });
+  const d = deps({
+    sources: { ...testSources([]), pages: [PAGE] },
+    fetch: fakeFetch({ [PAGE.url]: fixture("call.html") }),
+    assess: fakeAssessor({ "Call for Papers: 24th Asian Law Institute Conference": [call] }),
+  });
+  d.sources.openalex.enabled = false;
+  const report = await collect(d);
+
+  assert.deepEqual(report.failures, []);
+  assert.equal(report.itemsAdded, 1);
+  assert.equal(d.store.items("arthur")[0]!.url, PAGE.url);
+
+  const again = await collect({ ...d, assess: fakeAssessor({}) });
+  assert.equal(again.entriesAssessed, 0, "an unchanged page is not read again");
+});
+
+test("checking Sources reports feeds, pages, web pages mistaken for feeds, failures and switched-off entries", async () => {
+  const fetch = fakeFetch({
+    "https://blog.example/feed/": fixture("blog.rss.xml"),
+    "https://page.example/": "<html><body>Hello</body></html>",
+    "https://law.example/call.html": fixture("call.html"),
+  });
+  const sources = {
+    ...testSources([BLOG, { id: "page", name: "Page", url: "https://page.example/" }, { id: "gone", name: "Gone", url: "https://gone.example/feed/" }]),
+    pages: [
+      { id: "asli", name: "ASLI", url: "https://law.example/call.html" },
+      { id: "thin", name: "Thin", url: "https://page.example/" },
+      { id: "wechat", name: "WeChat", url: "http://localhost:4000/feeds/all.atom", enabled: false },
+    ],
+  };
+  const lines = await checkSources(sources, fetch, NOW);
+
   assert.match(lines[0]!, /^✓  Test Blog: 2 posts, newest 2026-10-/);
   assert.match(lines[1]!, /^\?  Page: no posts found/);
   assert.match(lines[2]!, /^✗  Gone: Gone returned 404/);
-  assert.match(lines[3]!, /^–  WeChat: switched off/);
+  assert.match(lines[3]!, /^✓  ASLI: \d+ characters, "Call for Papers: 24th Asian Law/);
+  assert.match(lines[4]!, /^\?  Thin: almost no text/);
+  assert.match(lines[5]!, /^–  WeChat: switched off/);
 });

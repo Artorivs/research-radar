@@ -55,6 +55,10 @@ const SourcesSchema = z.object({
       enabled: z.boolean().optional(),
     }),
   ),
+  /** Ordinary web pages with no feed, such as a conference's call-for-papers page. Read again when the text changes. */
+  pages: z
+    .array(z.object({ id: z.string().min(1), name: z.string(), url: z.string().url(), enabled: z.boolean().optional() }))
+    .default([]),
 });
 
 export type Topic = z.infer<typeof TopicSchema>;

@@ -2,7 +2,7 @@
  * Command line entry point.
  *
  *   npm run radar -- collect [--limit N] [--provider claude|ollama]   read every Source and file new Items
- *   npm run radar -- sources   check that every feed in config/sources.json can be read
+ *   npm run radar -- sources   check that every feed and page in config/sources.json can be read
  *   npm run radar -- serve [--port 4747]   open the dashboard at http://localhost:4747
  */
 import { mkdirSync } from "node:fs";
@@ -10,7 +10,7 @@ import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { loadProfile, loadSources, withOpenAlexKey } from "./config.ts";
 import { chooseAssessor } from "./provider.ts";
-import { checkFeeds, collect } from "./radar.ts";
+import { checkSources, collect } from "./radar.ts";
 import { startServer } from "./server.ts";
 import type { Fetch } from "./sources/entry.ts";
 import { Store } from "./store.ts";
@@ -59,7 +59,7 @@ switch (positionals[0]) {
     break;
   }
   case "sources": {
-    const lines = await checkFeeds(loadSources(values.sources).feeds, fetch as Fetch);
+    const lines = await checkSources(loadSources(values.sources), fetch as Fetch, new Date());
     for (const line of lines) console.log(line);
     store.close();
     break;

@@ -23,5 +23,8 @@
     { "id": "juwiss", "name": "JuWissBlog", "url": "https://www.juwiss.de/feed/" },
     { "id": "wikicfp-law", "name": "WikiCFP: law", "url": "http://www.wikicfp.com/cfp/rss?cat=law" },
     { "id": "wechat", "name": "WeChat Public Accounts", "url": "http://localhost:4000/feeds/all.atom", "enabled": false }
+  ],
+  "pages": [
+    { "id": "asli-conf", "name": "ASLI Annual Conference", "url": "https://law1a.nus.edu.sg/asli/24th_asli_conf/call_for_papers.html" }
   ]
 }
