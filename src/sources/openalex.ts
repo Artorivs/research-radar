@@ -147,17 +147,27 @@ export async function subfieldNames(config: SourcesConfig["openalex"], fetch: Fe
 
 /**
  * How each watched journal's ISSN resolves in OpenAlex: its name there, or null when OpenAlex doesn't know
- * the ISSN. Single-record lookups like these are free.
+ * the ISSN. Single-record lookups like these are free, but OpenAlex limits how many arrive each second, so
+ * they go one at a time and a refusal (429) is retried after a pause.
  */
-export async function journalNames(config: SourcesConfig["openalex"], fetch: Fetch): Promise<Array<{ name: string; issn: string; found: string | null }>> {
-  return Promise.all(
-    config.journals.map(async (j) => {
-      const res = await fetch(`https://api.openalex.org/sources/issn:${j.issn}${config.apiKey ? `?api_key=${config.apiKey}` : ""}`);
-      if (res.status === 404) return { ...j, found: null };
-      if (!res.ok) throw new Error(`OpenAlex returned ${res.status} for ISSN ${j.issn}`);
-      return { ...j, found: String((JSON.parse(await res.text()) as { display_name: string }).display_name) };
-    }),
-  );
+export async function journalNames(
+  config: SourcesConfig["openalex"],
+  fetch: Fetch,
+  pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<Array<{ name: string; issn: string; found: string | null }>> {
+  const checked = [];
+  for (const j of config.journals) {
+    const url = `https://api.openalex.org/sources/issn:${j.issn}${config.apiKey ? `?api_key=${config.apiKey}` : ""}`;
+    let res = await fetch(url);
+    for (let retry = 1; res.status === 429 && retry <= 3; retry++) {
+      await pause(1000 * retry);
+      res = await fetch(url);
+    }
+    if (res.status === 404) checked.push({ ...j, found: null });
+    else if (!res.ok) throw new Error(`OpenAlex returned ${res.status} for ISSN ${j.issn}`);
+    else checked.push({ ...j, found: String((JSON.parse(await res.text()) as { display_name: string }).display_name) });
+  }
+  return checked;
 }
 
 /** OpenAlex ships abstracts as word → positions; put the words back in order. */
