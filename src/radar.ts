@@ -8,6 +8,7 @@ import { isEvent, seriesKeyFor, type Deadline, type Kind } from "./domain.ts";
 import type { Entry, Fetch } from "./sources/entry.ts";
 import { readFeed } from "./sources/feed.ts";
 import { readOpenAlex } from "./sources/openalex.ts";
+import { readPage } from "./sources/page.ts";
 import type { NewItem, Store } from "./store.ts";
 
 /** How far a net 👍 or 👎 on earlier Events in a Series moves a new Event's Score. */
@@ -47,6 +48,7 @@ export async function collect(deps: RunDeps): Promise<RunReport> {
   const readers: Array<[string, () => Promise<Entry[]>]> = [
     ["OpenAlex", () => readOpenAlex(profile, sources.openalex, fetch, now)],
     ...sources.feeds.filter((feed) => feed.enabled !== false).map((feed): [string, () => Promise<Entry[]>] => [feed.name, () => readFeed(feed, fetch)]),
+    ...sources.pages.filter((page) => page.enabled !== false).map((page): [string, () => Promise<Entry[]>] => [page.name, () => readPage(page, fetch, now)]),
   ];
 
   for (const [name, read] of readers) {
@@ -145,23 +147,36 @@ async function fileEntry(entry: Entry, deps: RunDeps, report: RunReport): Promis
 }
 
 /**
- * One line per feed saying whether it can be read, for checking a new feed address before a collect run.
- * Reads only; nothing is assessed or stored.
+ * One line per feed and page saying whether it can be read, for checking a new address before a collect
+ * run. Reads only; nothing is assessed or stored.
  */
-export async function checkFeeds(feeds: SourcesConfig["feeds"], fetch: Fetch): Promise<string[]> {
-  return Promise.all(
-    feeds.map(async (feed) => {
-      if (feed.enabled === false) return `–  ${feed.name}: switched off ("enabled": false)`;
-      try {
-        const entries = await readFeed(feed, fetch);
-        if (entries.length === 0) return `?  ${feed.name}: no posts found; the address may be a web page rather than a feed`;
-        const newest = entries.map((e) => e.publishedAt ?? "").sort().at(-1)?.slice(0, 10);
-        return `✓  ${feed.name}: ${entries.length} posts${newest ? `, newest ${newest}` : ""}`;
-      } catch (error) {
-        return `✗  ${feed.name}: ${describe(error)}`;
-      }
-    }),
-  );
+export async function checkSources(sources: SourcesConfig, fetch: Fetch, now: Date): Promise<string[]> {
+  const feeds = sources.feeds.map(async (feed) => {
+    if (feed.enabled === false) return off(feed.name);
+    try {
+      const entries = await readFeed(feed, fetch);
+      if (entries.length === 0) return `?  ${feed.name}: no posts found; the address may be a web page rather than a feed`;
+      const newest = entries.map((e) => e.publishedAt ?? "").sort().at(-1)?.slice(0, 10);
+      return `✓  ${feed.name}: ${entries.length} posts${newest ? `, newest ${newest}` : ""}`;
+    } catch (error) {
+      return `✗  ${feed.name}: ${describe(error)}`;
+    }
+  });
+  const pages = sources.pages.map(async (page) => {
+    if (page.enabled === false) return off(page.name);
+    try {
+      const [entry] = await readPage(page, fetch, now);
+      if (!entry || entry.text.length < 200) return `?  ${page.name}: almost no text; the page may need a browser to show its content`;
+      return `✓  ${page.name}: ${entry.text.length} characters, "${entry.title.slice(0, 60)}"`;
+    } catch (error) {
+      return `✗  ${page.name}: ${describe(error)}`;
+    }
+  });
+  return Promise.all([...feeds, ...pages]);
+}
+
+function off(name: string): string {
+  return `–  ${name}: switched off ("enabled": false)`;
 }
 
 /** fetch() reports network trouble as "fetch failed" with the real reason in `cause`. */

@@ -69,9 +69,10 @@ Logs go to `data/collect.log` and `data/dashboard.log`. To stop a job, run
 
 ## Sources
 
-Edit [config/sources.json](config/sources.json) to add or remove feeds. Any RSS or Atom feed works,
+Edit [config/sources.json](config/sources.json) to add or remove Sources. Any RSS or Atom feed works,
 including a blog's category feed (e.g. only its calls for papers), which saves the model reading
-commentary. To switch a feed off without deleting it, add `"enabled": false`.
+commentary. Pages without a feed go under `"pages"` (see below). To switch any Source off without
+deleting it, add `"enabled": false`.
 
 After changing the list, check that every address can be read before a long run:
 
@@ -79,8 +80,32 @@ After changing the list, check that every address can be read before a long run:
 npm run radar -- sources
 ```
 
-It prints ✓ with the number of posts, ? when an address is a web page rather than a feed, and ✗ with the
-error. Nothing is assessed or saved.
+It prints ✓ with the number of posts (or, for a page, its length and title), ? when a feed address is
+really a web page or a page holds almost no text, and ✗ with the error. Nothing is assessed or saved.
+
+### Pages without a feed
+
+Many journals and institutes announce calls on a plain web page, such as a conference's call-for-papers
+page. Those go under `"pages"` in [config/sources.json](config/sources.json):
+
+```json
+"pages": [
+  { "id": "asli-conf", "name": "ASLI Annual Conference", "url": "https://law1a.nus.edu.sg/asli/24th_asli_conf/call_for_papers.html" }
+]
+```
+
+The whole page is one Entry: menus, headers and footers are dropped, and the rest is read as a single
+announcement, which may yield several Items or none. A page is read again only when its text changes, so
+an unchanged page costs nothing on later runs. `"enabled": false` works here too.
+
+Three things to know:
+
+- A page that shows anything which changes by itself, such as today's date or a visitor count, is read
+  again on every run. If a page keeps being reassessed, take it out.
+- A page built by JavaScript gives almost no text. `npm run radar -- sources` reports that as ?, and there
+  is nothing to be done but find another address.
+- An address tied to one year, like `24th_asli_conf`, stops working when the next conference is announced.
+  Prefer the society's standing calls page where there is one, and expect to update these now and then.
 
 ### WeChat Public Accounts (公众号)
 
@@ -178,7 +203,7 @@ The code follows the glossary's terms:
 | File | What it does |
 |---|---|
 | `src/domain.ts` | Kinds, Statuses, Deadlines, Past, Series keys |
-| `src/sources/` | Reading OpenAlex and RSS/Atom feeds into Entries |
+| `src/sources/` | Reading OpenAlex, RSS/Atom feeds and plain web pages into Entries |
 | `src/assess.ts` | The shared schema and prompt (rubric, Kinds, Deadlines, Oxford English summaries), and the Claude provider |
 | `src/ollama.ts`, `src/provider.ts` | The local Ollama provider, and choosing between the two |
 | `src/radar.ts` | One collection run: dedupe, Versions, Series Votes, filing Items |

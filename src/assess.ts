@@ -125,7 +125,10 @@ export function entryPrompt(entry: Entry, calibration: CalibrationVote[]): strin
       : "";
   const header = entry.paper
     ? `Paper Entry from ${entry.source}${entry.paper.venue ? `, venue: ${entry.paper.venue}` : ""}`
-    : `Feed Entry from ${entry.source}`;
+    : entry.kind === "page"
+      ? `Web page from ${entry.source}, read today. It may describe one opportunity, several, or none; menus and
+unrelated page furniture are not Items, and a date already past means the page is out of date, so return no Item for it`
+      : `Feed Entry from ${entry.source}`;
   return `${votes}${header}
 Published: ${entry.publishedAt ?? "unknown"}
 URL: ${entry.url}

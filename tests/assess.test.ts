@@ -47,6 +47,12 @@ test("the assessor sends a cached system prompt, low effort and the Votes, and r
   assert.match(user, /Feed Entry from blog/);
 });
 
+test("a web page Entry is announced as a page, so dates are read with care", async () => {
+  const { client, requests } = stubClient({ stop_reason: "end_turn", parsed_output: { items: [] } });
+  await claudeAssessor(testProfile(), client)({ ...entry, kind: "page" }, []);
+  assert.match((requests[0]!.messages as Array<{ content: string }>)[0]!.content, /Web page from blog, read today/);
+});
+
 test("a refusal yields no Items rather than an error", async () => {
   const { client } = stubClient({ stop_reason: "refusal", stop_details: { category: null }, parsed_output: null });
   const warn = console.warn;
