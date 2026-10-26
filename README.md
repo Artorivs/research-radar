@@ -7,7 +7,7 @@ dashboard on your Mac.
 - **What it means by Item, Kind, Call, Series, Score and so on:** [GLOSSARY.md](GLOSSARY.md)
 - **What was decided and why:** [DESIGN.md](DESIGN.md) and [docs/adr/](docs/adr/)
 
-This is **build stage 1**: OpenAlex plus a dozen blog and society feeds, scoring, and the dashboard. The weekly Digest,
+This is **build stage 1**: OpenAlex, fifty watched journals, and blog, society and conference feeds and pages, scoring, and the dashboard. The weekly Digest,
 deadline Alerts and the Gmail label come in stage 2.
 
 ## Set up on your Mac
@@ -129,6 +129,25 @@ Mac, turns the Public Accounts you choose into one feed via your WeChat Reading 
 WeWe RSS is an unofficial tool kept up by one person. The WeChat Reading login lapses now and then; when
 the check shows ✗ or the feed stops updating, scan the QR code again. Docker must be running at collect
 time (07:00 if you use the launchd job).
+
+### Watched journals
+
+Besides searching by Topic, the radar reads **every** new article in the journals listed under
+`openalex.journals` in [config/sources.json](config/sources.json), found by ISSN, whatever its wording.
+The list starts with about fifty leading journals across your Topics: international law, human rights,
+constitutional and administrative law, socio-legal studies, law and politics, and computational and
+empirical legal studies, in English, Chinese, Japanese and German. Add or remove any:
+
+```json
+{ "name": "Modern Law Review", "issn": "0026-7961" }
+```
+
+`npm run radar -- sources` looks each ISSN up in OpenAlex. It flags with ✗ an ISSN OpenAlex doesn't know
+(some Chinese and Japanese journals aren't indexed there) and with ? one whose OpenAlex name differs from
+yours, which usually means a wrong ISSN. These lookups are free.
+
+The first run after adding journals reads a month of their articles, a few hundred, which takes some hours
+with a local model. After that it is a handful a day.
 
 ### Paper quality filters
 

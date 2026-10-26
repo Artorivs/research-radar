@@ -7,7 +7,7 @@ import type { Profile, SourcesConfig } from "./config.ts";
 import { isEvent, seriesKeyFor, type Deadline, type Kind } from "./domain.ts";
 import type { Entry, Fetch } from "./sources/entry.ts";
 import { readFeed } from "./sources/feed.ts";
-import { readOpenAlex, subfieldNames } from "./sources/openalex.ts";
+import { journalNames, readOpenAlex, subfieldNames } from "./sources/openalex.ts";
 import { readPage } from "./sources/page.ts";
 import type { NewItem, Store } from "./store.ts";
 
@@ -181,7 +181,29 @@ export async function checkSources(sources: SourcesConfig, fetch: Fetch, now: Da
       return `✗  OpenAlex: ${describe(error)}`;
     }
   })();
-  return Promise.all([openalex, ...feeds, ...pages]);
+  const journals = (async () => {
+    if (!sources.openalex.enabled || sources.openalex.journals.length === 0) return [];
+    try {
+      const checked = await journalNames(sources.openalex, fetch);
+      const found = checked.filter((j) => j.found !== null);
+      const lines = [`${found.length === checked.length ? "✓" : "!"}  Journals: ${found.length} of ${checked.length} found in OpenAlex`];
+      for (const j of checked) {
+        if (j.found === null) lines.push(`✗    ${j.name} (${j.issn}): OpenAlex doesn't know this ISSN`);
+        else if (!sameJournal(j.name, j.found)) lines.push(`?    ${j.name} (${j.issn}): OpenAlex calls it "${j.found}"`);
+      }
+      return lines;
+    } catch (error) {
+      return [`✗  Journals: ${describe(error)}`];
+    }
+  })();
+  return [await openalex, ...(await journals), ...(await Promise.all([...feeds, ...pages]))];
+}
+
+/** Whether two journal names plausibly mean the same journal. A mismatch is only flagged with ?, since names vary. */
+function sameJournal(configured: string, openalex: string): boolean {
+  const words = (s: string) => s.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const [a, b] = [words(configured), words(openalex)];
+  return a.includes(b) || b.includes(a);
 }
 
 function off(name: string): string {
