@@ -7,7 +7,7 @@ import type { Profile, SourcesConfig } from "./config.ts";
 import { isEvent, seriesKeyFor, type Deadline, type Kind } from "./domain.ts";
 import type { Entry, Fetch } from "./sources/entry.ts";
 import { readFeed } from "./sources/feed.ts";
-import { readOpenAlex } from "./sources/openalex.ts";
+import { journalNames, readOpenAlex, subfieldNames } from "./sources/openalex.ts";
 import { readPage } from "./sources/page.ts";
 import type { NewItem, Store } from "./store.ts";
 
@@ -172,7 +172,38 @@ export async function checkSources(sources: SourcesConfig, fetch: Fetch, now: Da
       return `✗  ${page.name}: ${describe(error)}`;
     }
   });
-  return Promise.all([...feeds, ...pages]);
+  const openalex = (async () => {
+    if (!sources.openalex.enabled) return off("OpenAlex");
+    if (sources.openalex.subfields.length === 0) return "!  OpenAlex: not limited to any subfield, so expect papers far from law";
+    try {
+      return `✓  OpenAlex: limited to ${(await subfieldNames(sources.openalex, fetch)).join(", ")}`;
+    } catch (error) {
+      return `✗  OpenAlex: ${describe(error)}`;
+    }
+  })();
+  const journals = (async () => {
+    if (!sources.openalex.enabled || sources.openalex.journals.length === 0) return [];
+    try {
+      const checked = await journalNames(sources.openalex, fetch);
+      const found = checked.filter((j) => j.found !== null);
+      const lines = [`${found.length === checked.length ? "✓" : "!"}  Journals: ${found.length} of ${checked.length} found in OpenAlex`];
+      for (const j of checked) {
+        if (j.found === null) lines.push(`✗    ${j.name} (${j.issn}): OpenAlex doesn't know this ISSN`);
+        else if (!sameJournal(j.name, j.found)) lines.push(`?    ${j.name} (${j.issn}): OpenAlex calls it "${j.found}"`);
+      }
+      return lines;
+    } catch (error) {
+      return [`✗  Journals: ${describe(error)}`];
+    }
+  })();
+  return [await openalex, ...(await journals), ...(await Promise.all([...feeds, ...pages]))];
+}
+
+/** Whether two journal names plausibly mean the same journal. A mismatch is only flagged with ?, since names vary. */
+function sameJournal(configured: string, openalex: string): boolean {
+  const words = (s: string) => s.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const [a, b] = [words(configured), words(openalex)];
+  return a.includes(b) || b.includes(a);
 }
 
 function off(name: string): string {

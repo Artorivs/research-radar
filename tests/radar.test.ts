@@ -217,10 +217,44 @@ test("checking Sources reports feeds, pages, web pages mistaken for feeds, failu
   };
   const lines = await checkSources(sources, fetch, NOW);
 
-  assert.match(lines[0]!, /^✓  Test Blog: 2 posts, newest 2026-10-/);
-  assert.match(lines[1]!, /^\?  Page: no posts found/);
-  assert.match(lines[2]!, /^✗  Gone: Gone returned 404/);
-  assert.match(lines[3]!, /^✓  ASLI: \d+ characters, "Call for Papers: 24th Asian Law/);
-  assert.match(lines[4]!, /^\?  Thin: almost no text/);
-  assert.match(lines[5]!, /^–  WeChat: switched off/);
+  assert.match(lines[0]!, /^✗  OpenAlex: OpenAlex has no subfield 3308 \(404\)/);
+  assert.match(lines[1]!, /^✓  Test Blog: 2 posts, newest 2026-10-/);
+  assert.match(lines[2]!, /^\?  Page: no posts found/);
+  assert.match(lines[3]!, /^✗  Gone: Gone returned 404/);
+  assert.match(lines[4]!, /^✓  ASLI: \d+ characters, "Call for Papers: 24th Asian Law/);
+  assert.match(lines[5]!, /^\?  Thin: almost no text/);
+  assert.match(lines[6]!, /^–  WeChat: switched off/);
+
+  const named = await checkSources(
+    { ...testSources([]), openalex: { ...testSources().openalex, subfields: [3308, 3320] } },
+    fakeFetch({ "https://api.openalex.org/subfields/3308": '{"display_name":"Law"}', "https://api.openalex.org/subfields/3320": '{"display_name":"Political Science and International Relations"}' }),
+    NOW,
+  );
+  assert.equal(named[0], "✓  OpenAlex: limited to Law, Political Science and International Relations");
+});
+
+test("checking Sources resolves each watched journal's ISSN and flags unknown or mismatched ones", async () => {
+  const sources = {
+    ...testSources([]),
+    openalex: {
+      ...testSources().openalex,
+      journals: [
+        { name: "European Journal of International Law", issn: "0938-5428" },
+        { name: "Law & Society Review", issn: "0023-9216" },
+        { name: "中国法学", issn: "1003-1707" },
+      ],
+    },
+  };
+  const fetch = fakeFetch({
+    "https://api.openalex.org/subfields/3308": '{"display_name":"Law"}',
+    "https://api.openalex.org/sources/issn:0938-5428": '{"display_name":"European Journal of International Law"}',
+    "https://api.openalex.org/sources/issn:0023-9216": '{"display_name":"Journal of Something Else"}',
+  });
+  const lines = await checkSources(sources, fetch, NOW);
+  assert.deepEqual(lines, [
+    "✓  OpenAlex: limited to Law",
+    "!  Journals: 2 of 3 found in OpenAlex",
+    '?    Law & Society Review (0023-9216): OpenAlex calls it "Journal of Something Else"',
+    "✗    中国法学 (1003-1707): OpenAlex doesn't know this ISSN",
+  ]);
 });

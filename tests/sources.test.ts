@@ -33,7 +33,7 @@ test("OpenAlex works become Paper Entries, skipping datasets, excluded venues su
   assert.equal(entries[0]!.text, "Commissions of inquiry matter.");
   const asked = new URL(fetch.calls[0]!);
   assert.equal(asked.searchParams.get("search"), "international law");
-  assert.equal(asked.searchParams.get("filter"), "from_publication_date:2026-09-24");
+  assert.equal(asked.searchParams.get("filter"), "from_publication_date:2026-09-24,topics.subfield.id:3308");
 });
 
 test("fully open-access journals that neither the DOAJ nor the CWTS core list vouches for are skipped", async () => {
@@ -69,6 +69,37 @@ test("an OpenAlex key from .env is sent with each search, and a used-up allowanc
   const limited: Fetch = async () => ({ ok: false, status: 429, text: async () => "" });
   await assert.rejects(readOpenAlex(testProfile(), testSources().openalex, limited, NOW), /without a key is used up \(429\).*README/);
   await assert.rejects(readOpenAlex(testProfile(), sources.openalex, limited, NOW), /for your key is used up/);
+});
+
+test("several subfields are joined as alternatives, and none means no limit", async () => {
+  const fetch = fakeFetch({ "https://api.openalex.org/works": fixture("openalex.json") });
+  await readOpenAlex(testProfile(), { ...testSources().openalex, subfields: [3308, 3320] }, fetch, NOW);
+  assert.equal(new URL(fetch.calls[0]!).searchParams.get("filter"), "from_publication_date:2026-09-24,topics.subfield.id:3308|3320");
+  await readOpenAlex(testProfile(), { ...testSources().openalex, subfields: [] }, fetch, NOW);
+  assert.equal(new URL(fetch.calls.at(-1)!).searchParams.get("filter"), "from_publication_date:2026-09-24");
+});
+
+test("every new article in the watched journals is read, page by page, without the subfield or vetting filters", async () => {
+  const work = (id: string) => ({
+    id, doi: null, display_name: `Article ${id}`, publication_date: "2026-10-05", type: "article", abstract_inverted_index: null,
+    primary_location: { landing_page_url: `https://example.org/${id}`, source: { display_name: "German Law Journal", type: "journal", is_oa: true, is_in_doaj: false, is_core: false } },
+  });
+  const calls: string[] = [];
+  const fetch: Fetch = async (url) => {
+    calls.push(url);
+    const cursor = new URL(url).searchParams.get("cursor");
+    if (cursor === null) return { ok: true, status: 200, text: async () => JSON.stringify({ results: [] }) };
+    const body = cursor === "*" ? { results: [work("a"), work("b")], meta: { next_cursor: "page2" } } : cursor === "page2" ? { results: [work("c")], meta: { next_cursor: "page3" } } : { results: [], meta: { next_cursor: null } };
+    return { ok: true, status: 200, text: async () => JSON.stringify(body) };
+  };
+  const config = { ...testSources().openalex, journals: [{ name: "German Law Journal", issn: "2071-8322" }, { name: "Der Staat", issn: "0038-884X" }] };
+  const entries = await readOpenAlex(testProfile(), config, fetch, NOW);
+
+  assert.deepEqual(entries.map((e) => e.title).sort(), ["Article a", "Article b", "Article c"], "kept although unvetted by DOAJ or CWTS");
+  const journalCalls = calls.filter((u) => new URL(u).searchParams.has("cursor")).map((u) => new URL(u));
+  assert.equal(journalCalls[0]!.searchParams.get("filter"), "from_publication_date:2026-09-24,primary_location.source.issn:2071-8322|0038-884X");
+  assert.equal(journalCalls[0]!.searchParams.get("search"), null);
+  assert.deepEqual(journalCalls.map((u) => u.searchParams.get("cursor")), ["*", "page2", "page3"]);
 });
 
 test("abstracts are rebuilt from OpenAlex's inverted index", () => {
