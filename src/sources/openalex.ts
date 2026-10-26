@@ -1,6 +1,7 @@
 /**
- * Reads recent Papers from OpenAlex (https://docs.openalex.org), one search per Topic query.
- * Searches are billed against a small free daily allowance, which a free API key raises tenfold.
+ * Reads recent Papers from OpenAlex (https://docs.openalex.org) in two ways: one search per Topic query,
+ * and every new article in the journals the Sources list, whatever its wording.
+ * Requests are billed against a small free daily allowance, which a free API key raises tenfold.
  */
 import type { Profile, SourcesConfig } from "../config.ts";
 import type { Entry, Fetch } from "./entry.ts";
@@ -28,6 +29,33 @@ interface OpenAlexWork {
 }
 
 const WANTED_TYPES = new Set(["article", "preprint", "book-chapter", "review", "report"]);
+/** Pages of 200 read from the watched journals per run; a month of 50 journals is well within it. */
+const MAX_JOURNAL_PAGES = 10;
+
+function worksUrl(config: SourcesConfig["openalex"]): URL {
+  const url = new URL("https://api.openalex.org/works");
+  if (config.mailto) url.searchParams.set("mailto", config.mailto);
+  if (config.apiKey) url.searchParams.set("api_key", config.apiKey);
+  return url;
+}
+
+async function getWorks(
+  url: URL,
+  what: string,
+  config: SourcesConfig["openalex"],
+  fetch: Fetch,
+): Promise<{ results: OpenAlexWork[]; meta?: { next_cursor?: string | null } }> {
+  const res = await fetch(url.toString());
+  if (res.status === 429) {
+    throw new Error(
+      config.apiKey
+        ? `OpenAlex's daily allowance for your key is used up (429); Papers are read again on the next run`
+        : `OpenAlex's daily allowance without a key is used up (429). A free key raises it tenfold: see "OpenAlex key" in the README`,
+    );
+  }
+  if (!res.ok) throw new Error(`OpenAlex returned ${res.status} for ${what}`);
+  return JSON.parse(await res.text());
+}
 
 export async function readOpenAlex(
   profile: Profile,
@@ -38,27 +66,34 @@ export async function readOpenAlex(
   if (!config.enabled) return [];
   const since = new Date(now.getTime() - config.lookbackDays * 86_400_000).toISOString().slice(0, 10);
   const byId = new Map<string, Entry>();
+  const keep = (works: OpenAlexWork[], skipUnvetted: boolean) => {
+    for (const work of works) {
+      const entry = toEntry(work, config.excludeVenues, skipUnvetted);
+      if (entry) byId.set(entry.entryId, entry);
+    }
+  };
+
   for (const query of profile.topics.flatMap((t) => t.queries)) {
-    const url = new URL("https://api.openalex.org/works");
+    const url = worksUrl(config);
     url.searchParams.set("search", query);
-    url.searchParams.set("filter", `from_publication_date:${since}`);
+    const inSubfields = config.subfields.length > 0 ? `,topics.subfield.id:${config.subfields.join("|")}` : "";
+    url.searchParams.set("filter", `from_publication_date:${since}${inSubfields}`);
     url.searchParams.set("sort", "publication_date:desc");
     url.searchParams.set("per-page", String(config.perQuery));
-    if (config.mailto) url.searchParams.set("mailto", config.mailto);
-    if (config.apiKey) url.searchParams.set("api_key", config.apiKey);
-    const res = await fetch(url.toString());
-    if (res.status === 429) {
-      throw new Error(
-        config.apiKey
-          ? `OpenAlex's daily allowance for your key is used up (429); Papers are read again on the next run`
-          : `OpenAlex's daily allowance without a key is used up (429). A free key raises it tenfold: see "OpenAlex key" in the README`,
-      );
-    }
-    if (!res.ok) throw new Error(`OpenAlex returned ${res.status} for "${query}"`);
-    const body = JSON.parse(await res.text()) as { results: OpenAlexWork[] };
-    for (const work of body.results) {
-      const entry = toEntry(work, config.excludeVenues, config.skipUnvettedOpenAccessJournals);
-      if (entry) byId.set(entry.entryId, entry);
+    keep((await getWorks(url, `"${query}"`, config, fetch)).results, config.skipUnvettedOpenAccessJournals);
+  }
+
+  // The journals were chosen by hand, so neither the subfield limit nor the vetting check applies.
+  if (config.journals.length > 0) {
+    let cursor: string | null = "*";
+    for (let page = 0; cursor && page < MAX_JOURNAL_PAGES; page++) {
+      const url = worksUrl(config);
+      url.searchParams.set("filter", `from_publication_date:${since},primary_location.source.issn:${config.journals.map((j) => j.issn).join("|")}`);
+      url.searchParams.set("per-page", "200");
+      url.searchParams.set("cursor", cursor);
+      const body = await getWorks(url, "the watched journals", config, fetch);
+      keep(body.results, false);
+      cursor = body.results.length > 0 ? (body.meta?.next_cursor ?? null) : null;
     }
   }
   return [...byId.values()];
@@ -97,6 +132,32 @@ export function isUnvettedOpenAccessJournal(source: NonNullable<NonNullable<Open
 export function isExcludedVenue(venue: string, excludeVenues: string[]): boolean {
   const name = venue.toLowerCase();
   return excludeVenues.some((v) => name.includes(v.toLowerCase()));
+}
+
+/** The names OpenAlex gives the configured subfields, to confirm the ids mean what they are meant to. */
+export async function subfieldNames(config: SourcesConfig["openalex"], fetch: Fetch): Promise<string[]> {
+  return Promise.all(
+    config.subfields.map(async (id) => {
+      const res = await fetch(`https://api.openalex.org/subfields/${id}${config.apiKey ? `?api_key=${config.apiKey}` : ""}`);
+      if (!res.ok) throw new Error(`OpenAlex has no subfield ${id} (${res.status})`);
+      return String((JSON.parse(await res.text()) as { display_name: string }).display_name);
+    }),
+  );
+}
+
+/**
+ * How each watched journal's ISSN resolves in OpenAlex: its name there, or null when OpenAlex doesn't know
+ * the ISSN. Single-record lookups like these are free.
+ */
+export async function journalNames(config: SourcesConfig["openalex"], fetch: Fetch): Promise<Array<{ name: string; issn: string; found: string | null }>> {
+  return Promise.all(
+    config.journals.map(async (j) => {
+      const res = await fetch(`https://api.openalex.org/sources/issn:${j.issn}${config.apiKey ? `?api_key=${config.apiKey}` : ""}`);
+      if (res.status === 404) return { ...j, found: null };
+      if (!res.ok) throw new Error(`OpenAlex returned ${res.status} for ISSN ${j.issn}`);
+      return { ...j, found: String((JSON.parse(await res.text()) as { display_name: string }).display_name) };
+    }),
+  );
 }
 
 /** OpenAlex ships abstracts as word → positions; put the words back in order. */

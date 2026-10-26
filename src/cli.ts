@@ -59,7 +59,7 @@ switch (positionals[0]) {
     break;
   }
   case "sources": {
-    const lines = await checkSources(loadSources(values.sources), fetch as Fetch, new Date());
+    const lines = await checkSources(withOpenAlexKey(loadSources(values.sources), process.env.OPENALEX_API_KEY), fetch as Fetch, new Date());
     for (const line of lines) console.log(line);
     store.close();
     break;

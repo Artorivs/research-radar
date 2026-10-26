@@ -41,6 +41,13 @@ const SourcesSchema = z.object({
      * Papers whose venue name contains any of these (ignoring case) are skipped: open-upload sites with no
      * editorial or peer review, such as Zenodo.
      */
+    /**
+     * OpenAlex subfield ids (Scopus ASJC codes, e.g. 3308 Law) a Paper must be classed under, in any of its
+     * topics. Its keyword search alone matches words loosely, Chinese and Japanese especially. Empty: no limit.
+     */
+    subfields: z.array(z.number().int().positive()).default([]),
+    /** Journals whose every new article is read, found by ISSN. `npm run radar -- sources` checks each one. */
+    journals: z.array(z.object({ name: z.string(), issn: z.string().regex(/^\d{4}-\d{3}[\dX]$/) })).default([]),
     excludeVenues: z.array(z.string().min(1)).default([]),
     /** Skips fully open-access journals that neither the DOAJ nor the CWTS core list vouches for: the usual mark of a predatory journal. */
     skipUnvettedOpenAccessJournals: z.boolean().default(true),
