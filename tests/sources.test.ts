@@ -33,7 +33,7 @@ test("OpenAlex works become Paper Entries, skipping datasets, excluded venues su
   assert.equal(entries[0]!.text, "Commissions of inquiry matter.");
   const asked = new URL(fetch.calls[0]!);
   assert.equal(asked.searchParams.get("search"), "international law");
-  assert.equal(asked.searchParams.get("filter"), "from_publication_date:2026-09-24");
+  assert.equal(asked.searchParams.get("filter"), "from_publication_date:2026-09-24,topics.subfield.id:3308");
 });
 
 test("fully open-access journals that neither the DOAJ nor the CWTS core list vouches for are skipped", async () => {
@@ -69,6 +69,14 @@ test("an OpenAlex key from .env is sent with each search, and a used-up allowanc
   const limited: Fetch = async () => ({ ok: false, status: 429, text: async () => "" });
   await assert.rejects(readOpenAlex(testProfile(), testSources().openalex, limited, NOW), /without a key is used up \(429\).*README/);
   await assert.rejects(readOpenAlex(testProfile(), sources.openalex, limited, NOW), /for your key is used up/);
+});
+
+test("several subfields are joined as alternatives, and none means no limit", async () => {
+  const fetch = fakeFetch({ "https://api.openalex.org/works": fixture("openalex.json") });
+  await readOpenAlex(testProfile(), { ...testSources().openalex, subfields: [3308, 3320] }, fetch, NOW);
+  assert.equal(new URL(fetch.calls[0]!).searchParams.get("filter"), "from_publication_date:2026-09-24,topics.subfield.id:3308|3320");
+  await readOpenAlex(testProfile(), { ...testSources().openalex, subfields: [] }, fetch, NOW);
+  assert.equal(new URL(fetch.calls.at(-1)!).searchParams.get("filter"), "from_publication_date:2026-09-24");
 });
 
 test("abstracts are rebuilt from OpenAlex's inverted index", () => {

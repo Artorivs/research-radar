@@ -41,7 +41,8 @@ export async function readOpenAlex(
   for (const query of profile.topics.flatMap((t) => t.queries)) {
     const url = new URL("https://api.openalex.org/works");
     url.searchParams.set("search", query);
-    url.searchParams.set("filter", `from_publication_date:${since}`);
+    const inSubfields = config.subfields.length > 0 ? `,topics.subfield.id:${config.subfields.join("|")}` : "";
+    url.searchParams.set("filter", `from_publication_date:${since}${inSubfields}`);
     url.searchParams.set("sort", "publication_date:desc");
     url.searchParams.set("per-page", String(config.perQuery));
     if (config.mailto) url.searchParams.set("mailto", config.mailto);
@@ -97,6 +98,17 @@ export function isUnvettedOpenAccessJournal(source: NonNullable<NonNullable<Open
 export function isExcludedVenue(venue: string, excludeVenues: string[]): boolean {
   const name = venue.toLowerCase();
   return excludeVenues.some((v) => name.includes(v.toLowerCase()));
+}
+
+/** The names OpenAlex gives the configured subfields, to confirm the ids mean what they are meant to. */
+export async function subfieldNames(config: SourcesConfig["openalex"], fetch: Fetch): Promise<string[]> {
+  return Promise.all(
+    config.subfields.map(async (id) => {
+      const res = await fetch(`https://api.openalex.org/subfields/${id}${config.apiKey ? `?api_key=${config.apiKey}` : ""}`);
+      if (!res.ok) throw new Error(`OpenAlex has no subfield ${id} (${res.status})`);
+      return String((JSON.parse(await res.text()) as { display_name: string }).display_name);
+    }),
+  );
 }
 
 /** OpenAlex ships abstracts as word → positions; put the words back in order. */

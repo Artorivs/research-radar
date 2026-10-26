@@ -3,6 +3,7 @@
     "enabled": true,
     "mailto": "",
     "lookbackDays": 30,
+    "subfields": [3308, 3312, 3320, 3321],
     "excludeVenues": [
       "Zenodo", "Figshare", "ResearchGate", "Academia.edu", "OSF Preprints", "Open Science Framework",
       "Preprints.org", "Qeios", "Authorea", "Research Square", "Internet Archive"

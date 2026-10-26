@@ -7,7 +7,7 @@ import type { Profile, SourcesConfig } from "./config.ts";
 import { isEvent, seriesKeyFor, type Deadline, type Kind } from "./domain.ts";
 import type { Entry, Fetch } from "./sources/entry.ts";
 import { readFeed } from "./sources/feed.ts";
-import { readOpenAlex } from "./sources/openalex.ts";
+import { readOpenAlex, subfieldNames } from "./sources/openalex.ts";
 import { readPage } from "./sources/page.ts";
 import type { NewItem, Store } from "./store.ts";
 
@@ -172,7 +172,16 @@ export async function checkSources(sources: SourcesConfig, fetch: Fetch, now: Da
       return `✗  ${page.name}: ${describe(error)}`;
     }
   });
-  return Promise.all([...feeds, ...pages]);
+  const openalex = (async () => {
+    if (!sources.openalex.enabled) return off("OpenAlex");
+    if (sources.openalex.subfields.length === 0) return "!  OpenAlex: not limited to any subfield, so expect papers far from law";
+    try {
+      return `✓  OpenAlex: limited to ${(await subfieldNames(sources.openalex, fetch)).join(", ")}`;
+    } catch (error) {
+      return `✗  OpenAlex: ${describe(error)}`;
+    }
+  })();
+  return Promise.all([openalex, ...feeds, ...pages]);
 }
 
 function off(name: string): string {

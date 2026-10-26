@@ -133,8 +133,13 @@ time (07:00 if you use the launchd job).
 ### Paper quality filters
 
 OpenAlex indexes almost everything, including uploads nobody has reviewed. Before the model sees a Paper,
-three filters in [config/sources.json](config/sources.json) drop the worst of it:
+four filters in [config/sources.json](config/sources.json) drop the worst of it:
 
+- **`subfields`:** a record must be classed by OpenAlex under one of these subfields in any of its topics.
+  OpenAlex's keyword search matches words loosely, Chinese and Japanese above all, so without this a
+  search for 人工智能 法律 brings back papers on opera and concrete. The ids are Scopus subject codes:
+  3308 Law, 3312 Sociology and Political Science, 3320 Political Science and International Relations,
+  3321 Public Administration. `npm run radar -- sources` prints the names OpenAlex gives them, to confirm.
 - **No venue:** a record with no known journal or repository is skipped.
 - **`excludeVenues`:** a record whose venue name contains any of these words is skipped. The list starts
   with open-upload sites such as Zenodo, Figshare and ResearchGate. Add any journal you never want to see.

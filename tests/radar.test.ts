@@ -217,10 +217,18 @@ test("checking Sources reports feeds, pages, web pages mistaken for feeds, failu
   };
   const lines = await checkSources(sources, fetch, NOW);
 
-  assert.match(lines[0]!, /^✓  Test Blog: 2 posts, newest 2026-10-/);
-  assert.match(lines[1]!, /^\?  Page: no posts found/);
-  assert.match(lines[2]!, /^✗  Gone: Gone returned 404/);
-  assert.match(lines[3]!, /^✓  ASLI: \d+ characters, "Call for Papers: 24th Asian Law/);
-  assert.match(lines[4]!, /^\?  Thin: almost no text/);
-  assert.match(lines[5]!, /^–  WeChat: switched off/);
+  assert.match(lines[0]!, /^✗  OpenAlex: OpenAlex has no subfield 3308 \(404\)/);
+  assert.match(lines[1]!, /^✓  Test Blog: 2 posts, newest 2026-10-/);
+  assert.match(lines[2]!, /^\?  Page: no posts found/);
+  assert.match(lines[3]!, /^✗  Gone: Gone returned 404/);
+  assert.match(lines[4]!, /^✓  ASLI: \d+ characters, "Call for Papers: 24th Asian Law/);
+  assert.match(lines[5]!, /^\?  Thin: almost no text/);
+  assert.match(lines[6]!, /^–  WeChat: switched off/);
+
+  const named = await checkSources(
+    { ...testSources([]), openalex: { ...testSources().openalex, subfields: [3308, 3320] } },
+    fakeFetch({ "https://api.openalex.org/subfields/3308": '{"display_name":"Law"}', "https://api.openalex.org/subfields/3320": '{"display_name":"Political Science and International Relations"}' }),
+    NOW,
+  );
+  assert.equal(named[0], "✓  OpenAlex: limited to Law, Political Science and International Relations");
 });
