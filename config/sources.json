@@ -79,12 +79,10 @@
     { "id": "rcsl", "name": "RCSL (ISA Sociology of Law)", "url": "https://rcsl.hypotheses.org/feed" },
     { "id": "icon-s", "name": "ICON-S", "url": "https://www.icon-society.org/feed/" },
     { "id": "jurix", "name": "JURIX", "url": "https://jurix.nl/feed/" },
-    { "id": "legalscholarship", "name": "Legal Scholarship Blog", "url": "https://legalscholarshipblog.classcaster.net/feed/" },
     { "id": "wechat", "name": "WeChat Public Accounts", "url": "http://localhost:4000/feeds/all.atom", "enabled": false }
   ],
   "pages": [
     { "id": "asli-conf", "name": "ASLI Annual Conference", "url": "https://law1a.nus.edu.sg/asli/24th_asli_conf/call_for_papers.html" },
-    { "id": "callingallpapers", "name": "Calling All Papers (UGA Law Library)", "url": "https://callingallpapers.law.uga.edu/" },
     { "id": "voelkerrechtsblog-cfp", "name": "Völkerrechtsblog: calls for papers", "url": "https://voelkerrechtsblog.org/de/services/calls-for-papers" },
     { "id": "slsa-conference", "name": "SLSA Annual Conference", "url": "https://www.slsa.ac.uk/conference" }
   ]
