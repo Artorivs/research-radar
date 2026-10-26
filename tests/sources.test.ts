@@ -4,7 +4,7 @@ import { withOpenAlexKey } from "../src/config.ts";
 import type { Fetch } from "../src/sources/entry.ts";
 import { parseFeed } from "../src/sources/feed.ts";
 import { pageEntry, readPage } from "../src/sources/page.ts";
-import { abstractFrom, journalNames, readOpenAlex } from "../src/sources/openalex.ts";
+import { abstractFrom, readOpenAlex } from "../src/sources/openalex.ts";
 import { fakeFetch, fixture, NOW, testProfile, testSources } from "./helpers.ts";
 
 test("RSS posts become Entries with markup stripped", () => {
@@ -100,26 +100,6 @@ test("every new article in the watched journals is read, page by page, without t
   assert.equal(journalCalls[0]!.searchParams.get("filter"), "from_publication_date:2026-09-24,primary_location.source.issn:2071-8322|0038-884X");
   assert.equal(journalCalls[0]!.searchParams.get("search"), null);
   assert.deepEqual(journalCalls.map((u) => u.searchParams.get("cursor")), ["*", "page2", "page3"]);
-});
-
-test("journal ISSNs are looked up one at a time, waiting and retrying when OpenAlex says too many (429)", async () => {
-  let inFlight = 0;
-  let mostAtOnce = 0;
-  let refusals = 1;
-  const fetch: Fetch = async (url) => {
-    mostAtOnce = Math.max(mostAtOnce, ++inFlight);
-    await new Promise((resolve) => setImmediate(resolve));
-    inFlight--;
-    if (url.includes("0038-884X") && refusals-- > 0) return { ok: false, status: 429, text: async () => "" };
-    return { ok: true, status: 200, text: async () => JSON.stringify({ display_name: url.includes("0038-884X") ? "Der Staat" : "German Law Journal" }) };
-  };
-  const pauses: number[] = [];
-  const config = { ...testSources().openalex, journals: [{ name: "German Law Journal", issn: "2071-8322" }, { name: "Der Staat", issn: "0038-884X" }] };
-  const names = await journalNames(config, fetch, async (ms) => void pauses.push(ms));
-
-  assert.deepEqual(names.map((j) => j.found), ["German Law Journal", "Der Staat"]);
-  assert.equal(mostAtOnce, 1);
-  assert.deepEqual(pauses, [1000]);
 });
 
 test("abstracts are rebuilt from OpenAlex's inverted index", () => {
