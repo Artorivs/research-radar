@@ -53,7 +53,11 @@ test("the dashboard API lists Items and records Status, Votes and dismissals", a
   };
   const id = store.insertItem(paper, NOW);
   store.saveJudgement(id, profile.id, 6, ["International law"]);
-  const server = startServer(store, profile, 0, () => NOW);
+  store.addVersion(id, { source: "openalex", url: "u", label: "Japanese Yearbook of International Law", seenAt: NOW.toISOString() });
+  const call = store.insertItem({ ...paper, kind: "call", title: "Call for papers", language: "en" }, NOW);
+  store.saveJudgement(call, profile.id, 5, ["International law"]);
+  store.addVersion(call, { source: "ejiltalk", url: "c", label: "ejiltalk", seenAt: NOW.toISOString() });
+  const server = startServer(store, profile, 0, () => NOW, { ejiltalk: "EJIL:Talk!" });
   await new Promise((resolve) => server.once("listening", resolve));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const post = (path: string, body: unknown) =>
@@ -65,11 +69,14 @@ test("the dashboard API lists Items and records Status, Votes and dismissals", a
     assert.equal((await post(`/api/items/${id}/status`, { status: "attending" })).status, 400, "not a Status for a Paper");
     assert.equal((await post(`/api/items/${id}/vote`, { vote: 5 })).status, 400);
 
-    const body = (await (await fetch(`${base}/api/items`)).json()) as { items: Array<Item & { past: boolean }> };
-    assert.equal(body.items[0]!.title, "国際法と調査委員会");
-    assert.equal(body.items[0]!.status, "read");
-    assert.equal(body.items[0]!.vote, 1);
-    assert.equal(body.items[0]!.past, false);
+    const body = (await (await fetch(`${base}/api/items`)).json()) as { items: Array<Item & { past: boolean; from: string[] }> };
+    const listed = body.items.find((it) => it.id === id)!;
+    assert.equal(listed.title, "国際法と調査委員会");
+    assert.equal(listed.status, "read");
+    assert.equal(listed.vote, 1);
+    assert.equal(listed.past, false);
+    assert.deepEqual(listed.from, ["Japanese Yearbook of International Law"], "a Paper shows its journal");
+    assert.deepEqual(body.items.find((it) => it.id === call)!.from, ["EJIL:Talk!"], "anything else shows its Source's name");
 
     const page = await fetch(base + "/");
     assert.match(await page.text(), /<title>Research Radar<\/title>/);

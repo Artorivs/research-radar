@@ -80,6 +80,11 @@ export function loadSources(path: string): SourcesConfig {
   return SourcesSchema.parse(JSON.parse(readFileSync(path, "utf8")));
 }
 
+/** Each Source's id with the name to show for it, e.g. "ejiltalk" → "EJIL:Talk!". */
+export function sourceNames(sources: SourcesConfig): Record<string, string> {
+  return Object.fromEntries([["openalex", "OpenAlex"], ...[...sources.feeds, ...sources.pages].map((s) => [s.id, s.name])]);
+}
+
 export function withOpenAlexKey(sources: SourcesConfig, key: string | undefined): SourcesConfig {
   return key ? { ...sources, openalex: { ...sources.openalex, apiKey: key } } : sources;
 }

@@ -8,6 +8,8 @@ export interface ItemView extends Item {
   past: boolean;
   nextDeadline: string | null;
   meetsThreshold: boolean;
+  /** Where the Item was found: a Paper's journals or repositories, otherwise the names of the feeds and pages. */
+  from: string[];
 }
 
 /** An Item with a Submission deadline still ahead uses the lower bar, since missing one costs more. */
@@ -16,12 +18,14 @@ export function meetsThreshold(item: Item, profile: Profile, now: Date): boolean
   return item.score >= bar;
 }
 
-export function viewOf(item: Item, profile: Profile, now: Date): ItemView {
+export function viewOf(item: Item, profile: Profile, now: Date, sourceNames: Record<string, string> = {}): ItemView {
   return {
     ...item,
     past: isPast(item, now),
     nextDeadline: nextSubmissionDeadline(item, now)?.at ?? null,
     meetsThreshold: meetsThreshold(item, profile, now),
+    // A Paper's Version is labelled with its venue; any other Version carries just its Source's id.
+    from: [...new Set(item.versions.map((v) => (v.label === v.source ? (sourceNames[v.source] ?? v.source) : v.label)))],
   };
 }
 

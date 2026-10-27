@@ -8,7 +8,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { loadProfile, loadSources, withOpenAlexKey } from "./config.ts";
+import { loadProfile, loadSources, sourceNames, withOpenAlexKey } from "./config.ts";
 import { chooseAssessor } from "./provider.ts";
 import { checkSources, collect } from "./radar.ts";
 import { startServer } from "./server.ts";
@@ -66,7 +66,7 @@ switch (positionals[0]) {
   }
   case "serve": {
     const port = Number(values.port);
-    startServer(store, profile, port);
+    startServer(store, profile, port, undefined, sourceNames(loadSources(values.sources)));
     console.log(`Research Radar for ${profile.name}: http://localhost:${port}`);
     break;
   }

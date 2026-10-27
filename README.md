@@ -57,6 +57,9 @@ Logs go to `data/collect.log` and `data/dashboard.log`. To stop a job, run
 
 ## Using the dashboard
 
+- Beside the Kind, each card names where the Item was found: a Paper's journal or repository, or the
+  blog, society or page that announced anything else. To stop seeing a journal or site, add it to
+  `excludeVenues` (see [Paper quality filters](#paper-quality-filters)).
 - **Score** runs from −10 to +10. Items below 0, Past Items and Dismissed Items are hidden until you tick
   the boxes to show them.
 - **⭐ Save** sets the Status to "saved". The Status menu offers the values that fit the Kind: read for

@@ -11,7 +11,13 @@ import { deadlinesCalendar, viewOf } from "./views.ts";
 
 const PAGE = new URL("./ui/dashboard.html", import.meta.url);
 
-export function startServer(store: Store, profile: Profile, port: number, clock = () => new Date()): Server {
+export function startServer(
+  store: Store,
+  profile: Profile,
+  port: number,
+  clock = () => new Date(),
+  sourceNames: Record<string, string> = {},
+): Server {
   const page = readFileSync(PAGE, "utf8");
   const server = createServer((req, res) => {
     handle(req, res).catch((error: Error) => send(res, 400, { error: error.message }));
@@ -28,7 +34,7 @@ export function startServer(store: Store, profile: Profile, port: number, clock 
     if (req.method === "GET" && url.pathname === "/api/items") {
       send(res, 200, {
         profile: { name: profile.name, timezone: profile.timezone, topics: profile.topics.map((t) => t.name), thresholds: profile.thresholds, statuses: STATUSES },
-        items: store.items(profile.id).map((item) => viewOf(item, profile, now)),
+        items: store.items(profile.id).map((item) => viewOf(item, profile, now, sourceNames)),
       });
       return;
     }

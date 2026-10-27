@@ -29,6 +29,7 @@
   .score { grid-row: span 3; font-weight: 700; font-size: 18px; text-align: center; padding-top: 2px; font-variant-numeric: tabular-nums; }
   .score.hi { color: var(--good); } .score.lo { color: var(--bad); }
   .meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .from { font-style: italic; }
   .kind { text-transform: uppercase; letter-spacing: .04em; font-weight: 600; font-size: 11px; color: var(--accent); }
   h2 { font-size: 16px; margin: 0; line-height: 1.35; }
   h2 a { color: inherit; text-decoration: none; } h2 a:hover { text-decoration: underline; }
@@ -123,7 +124,7 @@ function visible() {
     ($("negative").checked || it.score >= 0) &&
     ($("past").checked || !it.past) &&
     ($("dismissed").checked || !it.dismissed) &&
-    (!q || [it.title, it.summary, it.abstract, it.keynotes.join(" ")].join(" ").toLowerCase().includes(q)));
+    (!q || [it.title, it.summary, it.abstract, it.keynotes.join(" "), it.from.join(" ")].join(" ").toLowerCase().includes(q)));
   const sort = $("sort").value;
   items.sort((a, b) =>
     sort === "deadline" ? (a.nextDeadline ?? "9999").localeCompare(b.nextDeadline ?? "9999") || b.score - a.score :
@@ -140,7 +141,7 @@ function card(it) {
   const otherDeadlines = it.deadlines.filter((d) => d !== next);
   return `<article class="${it.dismissed || it.past ? "faded" : ""}" data-id="${it.id}">
     <div class="score ${it.score >= 4 ? "hi" : it.score < 0 ? "lo" : ""}" title="Score">${it.score > 0 ? "+" : ""}${it.score}</div>
-    <div class="meta"><span class="kind">${KIND_LABEL[it.kind]}</span>${dates ? `<span>${esc(dates)}</span>` : ""}${loc ? `<span>${esc(loc)}</span>` : ""}${it.past ? "<span>Past</span>" : ""}</div>
+    <div class="meta"><span class="kind">${KIND_LABEL[it.kind]}</span>${it.from.length ? `<span class="from">${esc(it.from.join(" · "))}</span>` : ""}${dates ? `<span>${esc(dates)}</span>` : ""}${loc ? `<span>${esc(loc)}</span>` : ""}${it.past ? "<span>Past</span>" : ""}</div>
     <h2><a href="${esc(it.url)}" target="_blank" rel="noopener" lang="${esc(it.language)}">${esc(it.title)}</a></h2>
     <div style="grid-column:2;display:grid;gap:6px">
       <p class="summary">${esc(it.summary)}</p>
