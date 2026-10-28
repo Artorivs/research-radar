@@ -54,6 +54,25 @@ test("an announcements post yields one Item per opportunity, and commentary yiel
   assert.equal(paper.versions.length, 1);
 });
 
+test("a commentary post the model calls a Paper is filed as a blog post, and a call keeps its Event's place and Series", async () => {
+  const comment = "The ICJ’s advisory opinion: a comment";
+  const esilCall = item({
+    kind: "call",
+    title: "Call for papers: ESIL 2027 Annual Conference",
+    callForEvent: "ESIL 2027 Annual Conference",
+    location: { city: "Leiden", country: "Netherlands", mode: "in_person" },
+  });
+  const d = deps({ assess: fakeAssessor({ [ANNOUNCEMENTS]: [esilCall], [comment]: [item({ kind: "paper", title: comment })] }) });
+  d.sources.openalex.enabled = false;
+  await collect(d);
+
+  const items = d.store.items("arthur");
+  assert.equal(items.find((i) => i.title === comment)!.kind, "blog");
+  const call = items.find((i) => i.kind === "call")!;
+  assert.deepEqual(call.location, { city: "Leiden", country: "Netherlands", mode: "in_person" });
+  assert.equal(call.seriesKey, "esil annual conference");
+});
+
 test("Entries already read are not assessed again", async () => {
   const d = deps();
   await collect(d);

@@ -3,11 +3,13 @@
  * this file only gives those terms a shape.
  */
 
-export const KINDS = ["paper", "conference", "workshop", "seminar", "call", "course", "award", "job"] as const;
+export const KINDS = ["paper", "blog", "news", "call", "conference", "workshop", "seminar", "course", "award", "job"] as const;
 export type Kind = (typeof KINDS)[number];
 
 export const EVENT_KINDS: readonly Kind[] = ["conference", "workshop", "seminar"];
 export const isEvent = (kind: Kind): boolean => EVENT_KINDS.includes(kind);
+/** Kinds one reads rather than applies to or attends; they never become Past. */
+export const READING_KINDS: readonly Kind[] = ["paper", "blog", "news"];
 
 export const LANGUAGES = ["en", "zh-Hans", "zh-Hant", "ja", "de", "other"] as const;
 export type Language = (typeof LANGUAGES)[number];
@@ -17,10 +19,12 @@ export const ADJACENT = "Adjacent";
 /** Status values allowed for each Kind. Dismissed is separate (see GLOSSARY.md). */
 export const STATUSES: Record<Kind, readonly string[]> = {
   paper: ["saved", "read"],
+  blog: ["saved", "read"],
+  news: ["saved", "read"],
   conference: ["saved", "submitted", "attending"],
   workshop: ["saved", "submitted", "attending"],
   seminar: ["saved", "submitted", "attending"],
-  call: ["saved", "applied"],
+  call: ["saved", "submitted", "applied"],
   course: ["saved", "applied"],
   award: ["saved", "applied"],
   job: ["saved", "applied"],
@@ -89,11 +93,11 @@ export interface Item {
 }
 
 /**
- * Past: an Event that has taken place, or a non-Paper Item whose last Submission deadline has passed.
+ * Past: an Event that has taken place, or a Call or other opportunity whose last Submission deadline has passed.
  * Derived from dates, never stored.
  */
 export function isPast(item: Pick<Item, "kind" | "startsOn" | "endsOn" | "deadlines">, now: Date): boolean {
-  if (item.kind === "paper") return false;
+  if (READING_KINDS.includes(item.kind)) return false;
   if (isEvent(item.kind)) {
     const last = item.endsOn ?? item.startsOn;
     if (last) return endOfDayUtc(last) < now;

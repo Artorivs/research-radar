@@ -127,7 +127,9 @@ async function fileEntry(entry: Entry, deps: RunDeps, report: RunReport): Promis
   return assessed.length;
 
   function toNewItem(raw: AssessedItem, from: Entry): NewItem {
-    const kind: Kind = from.paper ? "paper" : raw.kind;
+    // Only OpenAlex supplies Papers; a small model sometimes calls a blog post one.
+    const kind: Kind = from.paper ? "paper" : raw.kind === "paper" ? "blog" : raw.kind;
+    const forEvent = kind === "call" ? raw.callForEvent : null;
     return {
       kind,
       title: from.paper ? from.title : raw.title.trim() || from.title,
@@ -137,11 +139,12 @@ async function fileEntry(entry: Entry, deps: RunDeps, report: RunReport): Promis
       url: from.url,
       doi: from.paper?.doi ?? null,
       keynotes: raw.keynotes,
-      location: isEvent(kind) ? raw.location : null,
+      location: isEvent(kind) || forEvent ? raw.location : null,
       startsOn: isoDate(raw.startsOn),
       endsOn: isoDate(raw.endsOn),
-      seriesKey: isEvent(kind) ? seriesKeyFor(raw.title) || null : null,
-      callForEventId: kind === "call" && raw.callForEvent ? store.findEventByTitle(raw.callForEvent) : null,
+      // A call for an Event belongs to that Event's Series, so a Vote on last year's call lifts this year's.
+      seriesKey: isEvent(kind) ? seriesKeyFor(raw.title) || null : forEvent ? seriesKeyFor(forEvent) || null : null,
+      callForEventId: forEvent ? store.findEventByTitle(forEvent) : null,
     };
   }
 }

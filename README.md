@@ -63,7 +63,8 @@ Logs go to `data/collect.log` and `data/dashboard.log`. To stop a job, run
 - **Score** runs from −10 to +10. Items below 0, Past Items and Dismissed Items are hidden until you tick
   the boxes to show them.
 - **⭐ Save** sets the Status to "saved". The Status menu offers the values that fit the Kind: read for
-  Papers; submitted and attending for Events; applied for Calls, Courses, Awards and Jobs.
+  Papers, blog posts and News; submitted and applied for Calls; submitted and attending for Events;
+  applied for Courses, Awards and Jobs.
 - **👍 / 👎** are Votes. The 30 most recent are shown to Claude with every new Entry, so scoring drifts
   towards your taste. A Vote on one edition of a recurring Event moves the next edition's Score by 2.
 - **Dismiss** means "not for me now". It hides the Item but doesn't change future Scores.
