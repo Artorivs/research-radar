@@ -206,9 +206,16 @@ test("checking Sources reports feeds, pages, web pages mistaken for feeds, failu
     "https://blog.example/feed/": fixture("blog.rss.xml"),
     "https://page.example/": "<html><body>Hello</body></html>",
     "https://law.example/call.html": fixture("call.html"),
+    "https://guarded.example/feed/":
+      '<html><head><meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=%2Ffeed%2F"></meta></head></html>',
   });
   const sources = {
-    ...testSources([BLOG, { id: "page", name: "Page", url: "https://page.example/" }, { id: "gone", name: "Gone", url: "https://gone.example/feed/" }]),
+    ...testSources([
+      BLOG,
+      { id: "page", name: "Page", url: "https://page.example/" },
+      { id: "gone", name: "Gone", url: "https://gone.example/feed/" },
+      { id: "guarded", name: "Guarded", url: "https://guarded.example/feed/" },
+    ]),
     pages: [
       { id: "asli", name: "ASLI", url: "https://law.example/call.html" },
       { id: "thin", name: "Thin", url: "https://page.example/" },
@@ -221,9 +228,10 @@ test("checking Sources reports feeds, pages, web pages mistaken for feeds, failu
   assert.match(lines[1]!, /^✓  Test Blog: 2 posts, newest 2026-10-/);
   assert.match(lines[2]!, /^\?  Page: no posts found/);
   assert.match(lines[3]!, /^✗  Gone: Gone returned 404/);
-  assert.match(lines[4]!, /^✓  ASLI: \d+ characters, "Call for Papers: 24th Asian Law/);
-  assert.match(lines[5]!, /^\?  Thin: almost no text/);
-  assert.match(lines[6]!, /^–  WeChat: switched off/);
+  assert.match(lines[4]!, /^✗  Guarded: Guarded showed a bot check \(captcha\)/);
+  assert.match(lines[5]!, /^✓  ASLI: \d+ characters, "Call for Papers: 24th Asian Law/);
+  assert.match(lines[6]!, /^\?  Thin: almost no text/);
+  assert.match(lines[7]!, /^–  WeChat: switched off/);
 
   const named = await checkSources(
     { ...testSources([]), openalex: { ...testSources().openalex, subfields: [3308, 3320] } },

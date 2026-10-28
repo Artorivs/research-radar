@@ -5,7 +5,7 @@
  */
 import { createHash } from "node:crypto";
 import type { SourcesConfig } from "../config.ts";
-import { stripHtml, type Entry, type Fetch } from "./entry.ts";
+import { refuseBotCheck, stripHtml, type Entry, type Fetch } from "./entry.ts";
 
 type Page = SourcesConfig["pages"][number];
 
@@ -15,7 +15,9 @@ const MAX_CHARS = 20_000;
 export async function readPage(page: Page, fetch: Fetch, now: Date): Promise<Entry[]> {
   const res = await fetch(page.url, { headers: { Accept: "text/html,application/xhtml+xml" } });
   if (!res.ok) throw new Error(`${page.name} returned ${res.status}`);
-  return [pageEntry(page, await res.text(), now)];
+  const html = await res.text();
+  refuseBotCheck(page.name, html);
+  return [pageEntry(page, html, now)];
 }
 
 export function pageEntry(page: Page, html: string, now: Date): Entry {
