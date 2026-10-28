@@ -26,7 +26,7 @@ export function testProfile(): Profile {
 }
 
 export function testSources(feeds: SourcesConfig["feeds"] = []): SourcesConfig {
-  return { openalex: { enabled: true, mailto: "", lookbackDays: 30, perQuery: 25, subfields: [3308], journals: [], excludeVenues: ["Zenodo"], skipUnvettedOpenAccessJournals: true }, feeds, pages: [] };
+  return { openalex: { enabled: true, mailto: "", lookbackDays: 30, perQuery: 25, subfields: [3308], journals: [], excludeVenues: ["Zenodo"], onlyVettedVenues: true, trustedVenues: ["SSRN"] }, feeds, pages: [] };
 }
 
 /** A fetch that answers from a table of URL prefixes; anything else is a 404. */

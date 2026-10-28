@@ -72,7 +72,7 @@ test("a later Version of a Paper joins the existing Item and is noted only if sa
     .replace('"https://openalex.org/W1"', '"https://openalex.org/W9"')
     .replace('"preprint"', '"article"')
     .replace('"https://ssrn.example/1"', '"https://journal.example/iclq"')
-    .replace('"SSRN"', '"International and Comparative Law Quarterly"');
+    .replace('"display_name": "SSRN"', '"display_name": "International and Comparative Law Quarterly", "is_core": true');
   const assess = fakeAssessor({});
   const report = await collect({ ...d, assess, fetch: fakeFetch({ "https://api.openalex.org/": published }) });
 

@@ -159,19 +159,27 @@ with a local model. After that it is a handful a day.
 ### Paper quality filters
 
 OpenAlex indexes almost everything, including uploads nobody has reviewed. Before the model sees a Paper,
-four filters in [config/sources.json](config/sources.json) drop the worst of it:
+these filters in [config/sources.json](config/sources.json) drop the worst of it:
 
-- **`subfields`:** a record must be classed by OpenAlex under one of these subfields in any of its topics.
-  OpenAlex's keyword search matches words loosely, Chinese and Japanese above all, so without this a
-  search for 人工智能 法律 brings back papers on opera and concrete. The ids are Scopus subject codes:
+- **`subfields`:** one of these subfields must be the record's main topic in OpenAlex. Its keyword search
+  matches words loosely, Chinese and Japanese above all, and a paper on theatre or medicine often carries a
+  minor topic in political science, so only the main topic counts. The ids are Scopus subject codes:
   3308 Law, 3312 Sociology and Political Science, 3320 Political Science and International Relations,
   3321 Public Administration. `npm run radar -- sources` prints the names OpenAlex gives them, to confirm.
+- **`onlyVettedVenues`:** a searched record is kept only if its journal is on the CWTS core list (the
+  established journals behind the Leiden Ranking) or in the Directory of Open Access Journals, or its venue
+  is named in **`trustedVenues`** (SSRN to start with). This drops predatory journals, open-upload sites and
+  obscure venues. It also drops some sound journals, especially Chinese ones; add any you trust to
+  `trustedVenues`, or to the watched journals.
+- **Open-upload sites:** a record from Zenodo, Figshare, OSF, ResearchGate, Academia.edu, Preprints.org,
+  Research Square, Qeios, Authorea or the Internet Archive is skipped, recognised by its DOI or address even
+  when OpenAlex files it under another venue's name.
 - **No venue:** a record with no known journal or repository is skipped.
-- **`excludeVenues`:** a record whose venue name contains any of these words is skipped. The list starts
-  with open-upload sites such as Zenodo, Figshare and ResearchGate. Add any journal you never want to see.
-- **`skipUnvettedOpenAccessJournals`:** a fully open-access journal is skipped unless the Directory of Open
-  Access Journals or the CWTS core list (the journals behind the Leiden Ranking) vouches for it. That is
-  the usual mark of a predatory journal. Subscription journals and SSRN are unaffected.
+- **`excludeVenues`:** a record whose venue name contains any of these words is skipped. Add any journal
+  you never want to see.
+
+Papers from the watched journals pass the vetting check, since you chose those journals yourself. The other
+filters still apply.
 
 ### OpenAlex key
 
