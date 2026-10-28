@@ -23,9 +23,9 @@ delivers them by weekly email and a local dashboard.
 
 ## 3. Item model
 Every item carries two independent axes plus metadata:
-- **Kind** (fixed): Paper, Conference, Workshop, Seminar, Call, Course,
-  Award, Job — see GLOSSARY.md. A conference's call for papers is a
-  Submission deadline on the Event, not a separate Item.
+- **Kind** (fixed): Paper, Blog post, News, Call, Conference, Workshop,
+  Seminar, Course, Award, Job — see GLOSSARY.md. Every call for papers is a
+  Call, including a conference's own (docs/adr/0003).
 - **Topics** (one or more, from §2, assigned by the model)
 - **Abstract / description** (paper abstract or CFP/event text)
 - **Keynote speakers** (conferences, when published)
@@ -39,7 +39,8 @@ Duplicates (same event from several sources) merge into one item. Everything
 is archived.
 
 Behaviour rules (from the vocabulary session):
-- A Call may link to an Event (e.g. a working group's panel call at LSA).
+- A Call may link to an Event (e.g. a working group's panel call at LSA), and
+  shares that Event's Series.
 - Each lecture-series session is its own Seminar in a Series; the Digest
   groups them under the Series heading.
 - Votes on one Event in a Series carry to later Events in it (net 👍 adds 2 to the

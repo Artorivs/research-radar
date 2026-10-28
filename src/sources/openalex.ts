@@ -29,6 +29,12 @@ interface OpenAlexWork {
 }
 
 const WANTED_TYPES = new Set(["article", "preprint", "book-chapter", "review", "report"]);
+/**
+ * Open-upload sites, where anyone can post anything. Their records sometimes reach OpenAlex under another
+ * venue's name, so they are also caught by the DOI prefix the site issues and by the address of the record.
+ */
+const OPEN_UPLOAD_DOI_PREFIXES = ["10.5281/", "10.6084/", "10.31219/", "10.31234/", "10.31235/", "10.17605/", "10.20944/", "10.21203/", "10.32388/", "10.22541/", "10.36227/"];
+const OPEN_UPLOAD_HOSTS = ["zenodo.org", "figshare.com", "osf.io", "researchgate.net", "academia.edu", "preprints.org", "researchsquare.com", "qeios.com", "authorea.com", "archive.org"];
 /** Pages of 200 read from the watched journals per run; a month of 50 journals is well within it. */
 const MAX_JOURNAL_PAGES = 10;
 
@@ -66,9 +72,9 @@ export async function readOpenAlex(
   if (!config.enabled) return [];
   const since = new Date(now.getTime() - config.lookbackDays * 86_400_000).toISOString().slice(0, 10);
   const byId = new Map<string, Entry>();
-  const keep = (works: OpenAlexWork[], skipUnvetted: boolean) => {
+  const keep = (works: OpenAlexWork[], searched: boolean) => {
     for (const work of works) {
-      const entry = toEntry(work, config.excludeVenues, skipUnvetted);
+      const entry = toEntry(work, config, searched);
       if (entry) byId.set(entry.entryId, entry);
     }
   };
@@ -76,11 +82,12 @@ export async function readOpenAlex(
   for (const query of profile.topics.flatMap((t) => t.queries)) {
     const url = worksUrl(config);
     url.searchParams.set("search", query);
-    const inSubfields = config.subfields.length > 0 ? `,topics.subfield.id:${config.subfields.join("|")}` : "";
+    // The main topic only: a paper on theatre or medicine often carries a minor topic in political science.
+    const inSubfields = config.subfields.length > 0 ? `,primary_topic.subfield.id:${config.subfields.join("|")}` : "";
     url.searchParams.set("filter", `from_publication_date:${since}${inSubfields}`);
     url.searchParams.set("sort", "publication_date:desc");
     url.searchParams.set("per-page", String(config.perQuery));
-    keep((await getWorks(url, `"${query}"`, config, fetch)).results, config.skipUnvettedOpenAccessJournals);
+    keep((await getWorks(url, `"${query}"`, config, fetch)).results, true);
   }
 
   // The journals were chosen by hand, so neither the subfield limit nor the vetting check applies.
@@ -99,13 +106,16 @@ export async function readOpenAlex(
   return [...byId.values()];
 }
 
-function toEntry(work: OpenAlexWork, excludeVenues: string[], skipUnvetted: boolean): Entry | null {
+/** A searched work must pass the vetting check; one from a watched journal was chosen by hand and need not. */
+function toEntry(work: OpenAlexWork, config: SourcesConfig["openalex"], searched: boolean): Entry | null {
   if (!work.display_name || (work.type && !WANTED_TYPES.has(work.type))) return null;
   const doi = work.doi ? work.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").toLowerCase() : null;
-  const venue = work.primary_location?.source?.display_name ?? null;
+  const source = work.primary_location?.source ?? null;
+  const venue = source?.display_name ?? null;
   // A work with no known venue is almost always an uploaded file with nothing vouching for it.
-  if (!venue || isExcludedVenue(venue, excludeVenues)) return null;
-  if (skipUnvetted && isUnvettedOpenAccessJournal(work.primary_location!.source!)) return null;
+  if (!source || !venue || namesAny(venue, config.excludeVenues)) return null;
+  if (isOpenUpload(doi, work.primary_location?.landing_page_url ?? null)) return null;
+  if (searched && config.onlyVettedVenues && !isVetted(source, config.trustedVenues)) return null;
   return {
     source: "openalex",
     entryId: work.id,
@@ -122,16 +132,24 @@ function toEntry(work: OpenAlexWork, excludeVenues: string[], skipUnvetted: bool
 }
 
 /**
- * The mark of a likely predatory journal: fully open access, yet vetted neither by the DOAJ nor by the CWTS
- * core list. Subscription and hybrid journals, DOAJ journals and repositories such as SSRN are unaffected.
+ * Vouched for by someone who checks journals: the CWTS core list (the established journals behind the Leiden
+ * Ranking) or the Directory of Open Access Journals, or named in trustedVenues (SSRN). Predatory journals,
+ * open-upload sites and obscure venues fail this.
  */
-export function isUnvettedOpenAccessJournal(source: NonNullable<NonNullable<OpenAlexWork["primary_location"]>["source"]>): boolean {
-  return source.type === "journal" && source.is_oa === true && source.is_in_doaj === false && source.is_core !== true;
+export function isVetted(source: NonNullable<NonNullable<OpenAlexWork["primary_location"]>["source"]>, trustedVenues: string[]): boolean {
+  return source.is_core === true || source.is_in_doaj === true || namesAny(source.display_name ?? "", trustedVenues);
 }
 
-export function isExcludedVenue(venue: string, excludeVenues: string[]): boolean {
+function isOpenUpload(doi: string | null, landingPage: string | null): boolean {
+  if (doi && OPEN_UPLOAD_DOI_PREFIXES.some((p) => doi.startsWith(p))) return true;
+  const host = landingPage ? URL.parse(landingPage)?.hostname.replace(/^www\./, "") : undefined;
+  return host !== undefined && OPEN_UPLOAD_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+}
+
+/** Whether the venue name contains any of these words, ignoring case. */
+export function namesAny(venue: string, words: string[]): boolean {
   const name = venue.toLowerCase();
-  return excludeVenues.some((v) => name.includes(v.toLowerCase()));
+  return words.some((v) => name.includes(v.toLowerCase()));
 }
 
 /** The names OpenAlex gives the configured subfields, to confirm the ids mean what they are meant to. */

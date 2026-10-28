@@ -2,8 +2,8 @@
  * Asks a model what an Entry contains and how relevant it is to a Profile. The schema and prompts here are
  * shared by every provider; this file also holds the Claude provider (see ollama.ts for the local one).
  *
- * One call per Entry returns every Item in it (a Paper, or the Events, Calls, Courses, Awards and Jobs a
- * post announces), each with a Score on the written rubric, Topics, an Oxford English summary, and the
+ * One call per Entry returns every Item in it (a Paper, a blog post or news report, or the Calls, Events,
+ * Courses, Awards and Jobs a post announces), each with a Score on the written rubric, Topics, an Oxford English summary, and the
  * Deadlines, Location and keynote speakers the text gives.
  */
 import Anthropic from "@anthropic-ai/sdk";
@@ -78,18 +78,20 @@ ${topics}
 ${seeds}
 ## What counts as an Item
 
-You receive one Entry: either a Paper record or a post from a blog, society or news feed. Return every Item it contains, using these Kinds:
-- paper: a single scholarly work. A Paper Entry yields exactly one paper Item.
-- conference: an Event with multiple panels, usually over several days, normally with an open call for papers.
-- workshop: a small, paper-based Event, often by invitation or selective submission.
+You receive one Entry: either a Paper record, a post from a blog, society or news feed, or a web page. Return every Item it contains, using these Kinds:
+- paper: a single scholarly work from a Paper Entry. A Paper Entry yields exactly one paper Item. Never use paper for a post or a page.
+- blog: a blog post that comments on or analyses law, a case, a treaty or events: commentary, case notes, symposium contributions, opinion pieces.
+- news: a post that reports a development rather than offering an opportunity: a judgment handed down, a law passed, an appointment, a report, a new journal issue or book.
+- call: ANY invitation to submit work: a call for papers, abstracts, panels or contributions to a conference, workshop, journal issue or edited volume, whoever issues it. If it is for an Event, put that Event's title in callForEvent and its dates and Location in startsOn, endsOn and location.
+- conference: an Event with multiple panels, usually over several days, announced without an open call (e.g. registration or programme).
+- workshop: a small, paper-based Event announced without an open call.
 - seminar: an Event that is a single talk or session (including a lecture series session), online or in person. Never call it a webinar.
-- call: an invitation to submit work that is either tied to no Event (journal special issue, edited volume) or issued by someone other than the Event's own organiser (e.g. a working group forming a panel at another body's conference; put that Event's title in callForEvent).
 - course: structured teaching one enrols in, such as summer or winter schools, PhD courses and methods training.
 - award: money or recognition applied for without an employment contract, such as grants, fellowships, prizes and scholarships.
 - job: a post with an employment contract. If it is unclear whether a postdoctoral "fellowship" is salaried, treat it as a job.
 
-A conference's or workshop's own call for papers is NOT a separate Item: it is a submission Deadline on that Event.
-Commentary, case notes, opinion pieces and news analysis are not Items. A post that only comments on law yields no Items: return an empty list. A post that announces several opportunities yields one Item for each.
+Every call for papers is a call Item, never a conference or workshop Item; its abstract or paper deadline is a submission Deadline on the call.
+A post that announces opportunities yields one Item for each and no blog or news Item. A post that only comments or reports yields exactly one blog or news Item.
 
 ## Deadlines
 

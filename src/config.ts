@@ -42,15 +42,18 @@ const SourcesSchema = z.object({
      * editorial or peer review, such as Zenodo.
      */
     /**
-     * OpenAlex subfield ids (Scopus ASJC codes, e.g. 3308 Law) a Paper must be classed under, in any of its
-     * topics. Its keyword search alone matches words loosely, Chinese and Japanese especially. Empty: no limit.
+     * OpenAlex subfield ids (Scopus ASJC codes, e.g. 3308 Law), one of which must be a Paper's main topic. Its keyword search alone matches words loosely, Chinese and Japanese especially. Empty: no limit.
      */
     subfields: z.array(z.number().int().positive()).default([]),
     /** Journals whose every new article is read, found by ISSN. `npm run radar -- sources` checks each one. */
     journals: z.array(z.object({ name: z.string(), issn: z.string().regex(/^\d{4}-\d{3}[\dX]$/) })).default([]),
     excludeVenues: z.array(z.string().min(1)).default([]),
-    /** Skips fully open-access journals that neither the DOAJ nor the CWTS core list vouches for: the usual mark of a predatory journal. */
-    skipUnvettedOpenAccessJournals: z.boolean().default(true),
+    /**
+     * Keeps a searched Paper only if its venue is on the CWTS core list or in the DOAJ, or is named in
+     * trustedVenues. This drops predatory journals and open-upload sites. Watched journals are exempt.
+     */
+    onlyVettedVenues: z.boolean().default(true),
+    trustedVenues: z.array(z.string().min(1)).default(["SSRN"]),
     perQuery: z.number().int().positive().max(200),
   }),
   feeds: z.array(

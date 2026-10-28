@@ -33,10 +33,10 @@ test("OpenAlex works become Paper Entries, skipping datasets, excluded venues su
   assert.equal(entries[0]!.text, "Commissions of inquiry matter.");
   const asked = new URL(fetch.calls[0]!);
   assert.equal(asked.searchParams.get("search"), "international law");
-  assert.equal(asked.searchParams.get("filter"), "from_publication_date:2026-09-24,topics.subfield.id:3308");
+  assert.equal(asked.searchParams.get("filter"), "from_publication_date:2026-09-24,primary_topic.subfield.id:3308");
 });
 
-test("fully open-access journals that neither the DOAJ nor the CWTS core list vouches for are skipped", async () => {
+test("searched Papers are kept only from venues on the CWTS core list, in the DOAJ, or trusted by name", async () => {
   const work = (id: string, source: Record<string, unknown>) => ({
     id, doi: null, display_name: `Paper ${id}`, publication_date: "2026-10-05", type: "article", abstract_inverted_index: null,
     primary_location: { landing_page_url: `https://example.org/${id}`, source: { display_name: `Venue ${id}`, ...source } },
@@ -53,10 +53,29 @@ test("fully open-access journals that neither the DOAJ nor the CWTS core list vo
   });
   const fetch = fakeFetch({ "https://api.openalex.org/works": body });
   const kept = (await readOpenAlex(testProfile(), testSources().openalex, fetch, NOW)).map((e) => e.title);
-  assert.deepEqual(kept.sort(), ["Paper core-oa", "Paper doaj", "Paper no-flags", "Paper ssrn", "Paper subscription"]);
+  assert.deepEqual(kept.sort(), ["Paper core-oa", "Paper doaj", "Paper ssrn"], "SSRN is trusted by name");
 
-  const all = await readOpenAlex(testProfile(), { ...testSources().openalex, skipUnvettedOpenAccessJournals: false }, fetch, NOW);
+  const untrusting = await readOpenAlex(testProfile(), { ...testSources().openalex, trustedVenues: [] }, fetch, NOW);
+  assert.deepEqual(untrusting.map((e) => e.title).sort(), ["Paper core-oa", "Paper doaj"]);
+
+  const all = await readOpenAlex(testProfile(), { ...testSources().openalex, onlyVettedVenues: false }, fetch, NOW);
   assert.equal(all.length, 6);
+});
+
+test("records from open-upload sites are skipped by DOI prefix or address, whatever venue they claim", async () => {
+  const work = (id: string, doi: string | null, landing: string) => ({
+    id, doi, display_name: `Paper ${id}`, publication_date: "2026-10-05", type: "article", abstract_inverted_index: null,
+    primary_location: { landing_page_url: landing, source: { display_name: "Some Law Review", type: "journal", is_core: true } },
+  });
+  const body = JSON.stringify({
+    results: [
+      work("zenodo-doi", "https://doi.org/10.5281/zenodo.123", "https://example.org/a"),
+      work("zenodo-page", null, "https://www.zenodo.org/records/9"),
+      work("ssrn", "https://doi.org/10.2139/ssrn.1", "https://papers.ssrn.com/1"),
+    ],
+  });
+  const kept = await readOpenAlex(testProfile(), testSources().openalex, fakeFetch({ "https://api.openalex.org/works": body }), NOW);
+  assert.deepEqual(kept.map((e) => e.title), ["Paper ssrn"]);
 });
 
 test("an OpenAlex key from .env is sent with each search, and a used-up allowance says how to fix it", async () => {
@@ -74,7 +93,7 @@ test("an OpenAlex key from .env is sent with each search, and a used-up allowanc
 test("several subfields are joined as alternatives, and none means no limit", async () => {
   const fetch = fakeFetch({ "https://api.openalex.org/works": fixture("openalex.json") });
   await readOpenAlex(testProfile(), { ...testSources().openalex, subfields: [3308, 3320] }, fetch, NOW);
-  assert.equal(new URL(fetch.calls[0]!).searchParams.get("filter"), "from_publication_date:2026-09-24,topics.subfield.id:3308|3320");
+  assert.equal(new URL(fetch.calls[0]!).searchParams.get("filter"), "from_publication_date:2026-09-24,primary_topic.subfield.id:3308|3320");
   await readOpenAlex(testProfile(), { ...testSources().openalex, subfields: [] }, fetch, NOW);
   assert.equal(new URL(fetch.calls.at(-1)!).searchParams.get("filter"), "from_publication_date:2026-09-24");
 });

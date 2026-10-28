@@ -7,3 +7,5 @@ Score, Vote and Status instead of a CFP Item and a conference Item that drift
 apart. A Call exists as an Item only when someone other than the Event's
 organiser issues it, or when no Event is involved (special issues, edited
 volumes).
+
+Superseded by [0003](0003-every-call-for-papers-is-a-call.md).

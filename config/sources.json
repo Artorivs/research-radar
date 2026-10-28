@@ -55,7 +55,8 @@
       "Zenodo", "Figshare", "ResearchGate", "Academia.edu", "OSF Preprints", "Open Science Framework",
       "Preprints.org", "Qeios", "Authorea", "Research Square", "Internet Archive"
     ],
-    "skipUnvettedOpenAccessJournals": true,
+    "onlyVettedVenues": true,
+    "trustedVenues": ["SSRN"],
     "perQuery": 25
   },
   "feeds": [

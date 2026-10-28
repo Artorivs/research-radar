@@ -10,7 +10,7 @@ Anything the radar collects and scores, whatever its Kind.
 _Avoid_: Entry, listing, record, post
 
 **Kind**:
-The fixed classification of an Item: Paper, Conference, Workshop, Seminar, Call, Course, Award or Job.
+The fixed classification of an Item: Paper, Blog post, News, Call, Conference, Workshop, Seminar, Course, Award or Job.
 _Avoid_: Type, category, format
 
 **Event**:
@@ -18,7 +18,7 @@ An Item that takes place at a time and Location: a Conference, Workshop or Semin
 _Avoid_: Meeting, gathering, activity
 
 **Conference**:
-An Event with multiple panels, usually over several days, normally with an open call for papers.
+An Event with multiple panels, usually over several days, announced without an open call (its call for papers is a Call).
 _Avoid_: Congress, symposium (as Kinds)
 
 **Workshop**:
@@ -30,7 +30,7 @@ An Event consisting of a single talk or session, including lecture series, wheth
 _Avoid_: Webinar, lecture, talk
 
 **Call**:
-An invitation to submit work issued by someone other than an Event's own organiser, or tied to no Event at all: a journal special issue, an edited volume, or a working group's call to form a panel at another body's Conference.
+Any invitation to submit work: a call for papers, abstracts or panels for a Conference or Workshop (whoever issues it), a journal special issue or an edited volume. A Call for an Event carries that Event's dates, Location and Series.
 _Avoid_: CFP (as a Kind), call for papers, solicitation
 
 **Course**:
@@ -44,6 +44,14 @@ _Avoid_: Grant, fellowship, prize, scholarship, funding (as Kinds)
 **Job**:
 A post with an employment contract; an ambiguous postdoctoral "fellowship" counts as a Job.
 _Avoid_: Position, vacancy, opening
+
+**Blog post**:
+A post commenting on or analysing law, a case or events: commentary, a case note, a symposium contribution.
+_Avoid_: Article, comment, post (as Kinds)
+
+**News**:
+A post reporting a development rather than offering an opportunity: a judgment, a new law, an appointment, a report, a new journal issue.
+_Avoid_: Announcement, update (as Kinds)
 
 **Paper**:
 A single scholarly work, however many Versions of it exist.
