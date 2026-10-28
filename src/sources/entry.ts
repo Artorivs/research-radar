@@ -31,6 +31,16 @@ const NAMED_ENTITIES: Record<string, string> = {
   copy: "©", reg: "®", trade: "™", deg: "°", euro: "€", pound: "£", times: "×", shy: "", zwj: "", zwnj: "",
 };
 
+/**
+ * Some hosts (SiteGround, Cloudflare) answer a request they take for a bot with a captcha page instead of
+ * the feed or page, often because the address it comes from belongs to a VPN or data centre.
+ */
+export function refuseBotCheck(name: string, body: string): void {
+  if (/sgcaptcha|challenge-platform|cf-chl-|<title>Just a moment/i.test(body.slice(0, 5000))) {
+    throw new Error(`${name} showed a bot check (captcha) instead of its content. This often clears by itself; if you use a VPN, try without it`);
+  }
+}
+
 export function stripHtml(html: string): string {
   return html
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")

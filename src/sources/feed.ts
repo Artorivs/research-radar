@@ -3,7 +3,7 @@
  */
 import { XMLParser } from "fast-xml-parser";
 import type { SourcesConfig } from "../config.ts";
-import { stripHtml, type Entry, type Fetch } from "./entry.ts";
+import { refuseBotCheck, stripHtml, type Entry, type Fetch } from "./entry.ts";
 
 type Feed = SourcesConfig["feeds"][number];
 
@@ -12,7 +12,9 @@ const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@"
 export async function readFeed(feed: Feed, fetch: Fetch): Promise<Entry[]> {
   const res = await fetch(feed.url, { headers: { Accept: "application/rss+xml, application/atom+xml, application/xml" } });
   if (!res.ok) throw new Error(`${feed.name} returned ${res.status}`);
-  return parseFeed(feed.id, await res.text());
+  const body = await res.text();
+  refuseBotCheck(feed.name, body);
+  return parseFeed(feed.id, body);
 }
 
 export function parseFeed(sourceId: string, xml: string): Entry[] {
